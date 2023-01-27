@@ -487,6 +487,38 @@ func resourceComputeInstance() *schema.Resource {
 							Computed:    true,
 							Description: `The RFC 4648 base64 encoded SHA-256 hash of the customer-supplied encryption key that protects this resource.`,
 						},
+						"initialize_params": {
+							Type:        schema.TypeList,
+							Optional:    true,
+							Computed:    true,
+							ForceNew:    true,
+							MaxItems:    1,
+							ConfigMode:  schema.SchemaConfigModeAttr,
+							Description: `Parameters with which a disk was created alongside the instance.`,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"size": {
+										Type:     schema.TypeInt,
+										Optional: true,
+										// AtLeastOneOf: initializeParamsKeys,
+										Computed:     true,
+										ForceNew:     true,
+										ValidateFunc: validation.IntAtLeast(1),
+										Description:  `The size of the image in gigabytes.`,
+									},
+
+									"type": {
+										Type:     schema.TypeString,
+										Optional: true,
+										// AtLeastOneOf: initializeParamsKeys,
+										Computed:    true,
+										ForceNew:    true,
+										Description: `The Google Compute Engine disk type. Such as pd-standard, pd-ssd or pd-balanced.`,
+									},
+								},
+							},
+						},
+						
 					},
 				},
 			},
@@ -1025,11 +1057,11 @@ func expandComputeInstance(project string, d *schema.ResourceData, config *Confi
 
 	for i := 0; i < attachedDisksCount; i++ {
 		diskConfig := d.Get(fmt.Sprintf("attached_disk.%d", i)).(map[string]interface{})
-		disk, err := expandAttachedDisk(diskConfig, d, config)
+		disk, err := expandAttachedDisk(diskConfig, d, config, i)
 		if err != nil {
 			return nil, err
 		}
-
+		fmt.Print(disk)
 		disks = append(disks, disk)
 	}
 
@@ -1786,9 +1818,9 @@ func resourceComputeInstanceUpdate(d *schema.ResourceData, meta interface{}) err
 		// Since changing any field within the disk needs to detach+reattach it,
 		// keep track of the hash of the full disk.
 		oDisks := map[uint64]string{}
-		for _, disk := range o.([]interface{}) {
+		for i, disk := range o.([]interface{}) {
 			diskConfig := disk.(map[string]interface{})
-			computeDisk, err := expandAttachedDisk(diskConfig, d, config)
+			computeDisk, err := expandAttachedDisk(diskConfig, d, config, i)
 			if err != nil {
 				return err
 			}
@@ -1809,7 +1841,7 @@ func resourceComputeInstanceUpdate(d *schema.ResourceData, meta interface{}) err
 		var attach []*compute.AttachedDisk
 		for _, disk := range n.([]interface{}) {
 			diskConfig := disk.(map[string]interface{})
-			computeDisk, err := expandAttachedDisk(diskConfig, d, config)
+			computeDisk, err := expandAttachedDisk(diskConfig, d, config,i)
 			if err != nil {
 				return err
 			}
@@ -2197,8 +2229,11 @@ func startInstanceOperation(d *schema.ResourceData, config *Config) (*compute.Op
 	return op, err
 }
 
-func expandAttachedDisk(diskConfig map[string]interface{}, d *schema.ResourceData, meta interface{}) (*compute.AttachedDisk, error) {
+func expandAttachedDisk(diskConfig map[string]interface{}, d *schema.ResourceData, meta interface{}, diskIndex int) (*compute.AttachedDisk, error) {
 	config := meta.(*Config)
+	diskSize := fmt.Sprintf("initialize_params.%d.size", diskIndex)
+	diskType := fmt.Sprintf("initialize_params.%d.type", diskIndex)
+
 
 	s := diskConfig["source"].(string)
 	var sourceLink string
@@ -2218,6 +2253,27 @@ func expandAttachedDisk(diskConfig map[string]interface{}, d *schema.ResourceDat
 
 	disk := &compute.AttachedDisk{
 		Source: sourceLink,
+	}
+
+	if _, ok := diskConfig["initialize_params"]; ok {
+		disk.InitializeParams = &compute.AttachedDiskInitializeParams{}
+
+		if v, ok := diskConfig[diskSize]; ok {
+			disk.InitializeParams.DiskSizeGb = int64(v.(int))
+		}
+
+		if v, ok := diskConfig[diskType]; ok {
+			diskTypeName := v.(string)
+			diskType, err := readDiskType(config, d, diskTypeName)
+			if err != nil {
+				return nil, fmt.Errorf("Error loading disk type '%s': %s", diskTypeName, err)
+			}
+			disk.InitializeParams.DiskType = diskType.RelativeLink()
+		}
+	if _, ok := diskConfig["initialize_params.0.name"]; ok {
+		disk.InitializeParams.Labels = expandStringMap(d, "initialize_params.0.labels")
+	}
+
 	}
 
 	if v, ok := diskConfig["mode"]; ok {
