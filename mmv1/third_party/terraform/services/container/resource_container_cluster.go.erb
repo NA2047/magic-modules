@@ -852,7 +852,15 @@ func ResourceContainerCluster() *schema.Resource {
 					},
 				},
 			},
-
+<% unless version == 'ga' -%>
+			"enable_nested_virtualization": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				ForceNew:    true,
+				Default: 	 false,
+				Description: `Whether to enable nested virtualization or not (default is false).`,
+			},
+<% end -%>
 			"enable_tpu": {
 				Type:        schema.TypeBool,
 				Optional:    true,
@@ -2260,6 +2268,9 @@ func resourceContainerClusterCreate(d *schema.ResourceData, meta interface{}) er
 <% unless version == 'ga' -%>
 		ClusterTelemetry: expandClusterTelemetry(d.Get("cluster_telemetry")),
 <% end -%>
+<% unless version == 'ga' -%>
+        EnableNestedVirtualization: d.Get("enable_nested_virtualization").(bool),
+<% end -%>
 		EnableTpu:               d.Get("enable_tpu").(bool),
 		NetworkConfig: &container.NetworkConfig{
 			EnableIntraNodeVisibility:            d.Get("enable_intranode_visibility").(bool),
@@ -2791,6 +2802,9 @@ func resourceContainerClusterRead(d *schema.ResourceData, meta interface{}) erro
 	}
 	if err := d.Set("confidential_nodes", flattenConfidentialNodes(cluster.ConfidentialNodes)); err != nil {
 		return err
+	}
+	if err := d.Set("enable_nested_virtualization", cluster.EnableNestedVirtualization); err != nil {
+		return fmt.Errorf("Error setting enable_nested_virtualization: %s", err)
 	}
 	if err := d.Set("enable_tpu", cluster.EnableTpu); err != nil {
 		return fmt.Errorf("Error setting enable_tpu: %s", err)
