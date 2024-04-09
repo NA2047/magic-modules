@@ -2803,9 +2803,11 @@ func resourceContainerClusterRead(d *schema.ResourceData, meta interface{}) erro
 	if err := d.Set("confidential_nodes", flattenConfidentialNodes(cluster.ConfidentialNodes)); err != nil {
 		return err
 	}
+<% unless version == 'ga' -%>
 	if err := d.Set("enable_nested_virtualization", cluster.EnableNestedVirtualization); err != nil {
 		return fmt.Errorf("Error setting enable_nested_virtualization: %s", err)
 	}
+<% end -%>
 	if err := d.Set("enable_tpu", cluster.EnableTpu); err != nil {
 		return fmt.Errorf("Error setting enable_tpu: %s", err)
 	}

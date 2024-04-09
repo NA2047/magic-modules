@@ -263,6 +263,12 @@ func GetContainerClusterApiObject(d tpgresource.TerraformResourceData, config *t
 	} else if v, ok := d.GetOkExists("enable_tpu"); !tpgresource.IsEmptyValue(reflect.ValueOf(enableTpuProp)) && (ok || !reflect.DeepEqual(v, enableTpuProp)) {
 		obj["enableTpu"] = enableTpuProp
 	}
+	enableNestedVirtualizationProp, err := expandContainerClusterEnableNestedVirtualization(d.Get("enable_nested_virtualization"), d, config)
+	if err != nil {
+		return nil, err
+	} else if v, ok := d.GetOkExists("enable_nested_virtualization"); !tpgresource.IsEmptyValue(reflect.ValueOf(enableNestedVirtualizationProp)) && (ok || !reflect.DeepEqual(v, enableNestedVirtualizationProp)) {
+		obj["enableNestedVirtualization"] = enableNestedVirtualizationProp
+	}
 	tpuIpv4CidrBlockProp, err := expandContainerClusterTPUIpv4CidrBlock(d.Get("tpu_ipv4_cidr_block"), d, config)
 	if err != nil {
 		return nil, err
@@ -1089,6 +1095,10 @@ func expandContainerClusterMinMasterVersion(v interface{}, d tpgresource.Terrafo
 }
 
 func expandContainerClusterEnableTpu(v interface{}, d tpgresource.TerraformResourceData, config *transport_tpg.Config) (interface{}, error) {
+	return v, nil
+}
+
+func expandContainerClusterEnableNestedVirtualization(v interface{}, d tpgresource.TerraformResourceData, config *transport_tpg.Config) (interface{}, error) {
 	return v, nil
 }
 
