@@ -1,5 +1,49 @@
 if v, ok := d.GetOkExists("status"); !tpgresource.IsEmptyValue(reflect.ValueOf(statusProp)) && (ok || !reflect.DeepEqual(v, statusProp)) {
 	log.Printf("[DEBUG] Calling update after create to patch in google_compute_public_advertised_prefix")
 	// staus on google_compute_public_advertised_prefix cannot be added on create
+	policyUrl := fmt.Sprintf("{{ComputeBasePath}}%s", d.Get("policy_id"))
+	url, err = tpgresource.ReplaceVars(d, config, policyUrl)
+	if err != nil {
+		return err
+	}
+
+	policyRes, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+		Config: config,
+		Method: "GET",
+		RawURL: url,
+		UserAgent: userAgent,
+	})
+	if err != nil {
+		return transport_tpg.HandleNotFoundError(err, d, fmt.Sprintf("ComputeOrganizationSecurityPolicy %q", d.Get("policy_id")))
+	}
+
+	parent := flattenComputeOrganizationSecurityPolicyParent(policyRes["parent"], d, config)
+	var opRes map[string]interface{}
+	err = ComputeOrgOperationWaitTimeWithResponse(
+		config, res, &opRes, parent.(string), "Creating OrganizationSecurityPolicyRule", userAgent,
+		d.Timeout(schema.TimeoutCreate))
+
+	if err != nil {
+		// The resource didn't actually create
+		d.SetId("")
+		return fmt.Errorf("Error waiting to create OrganizationSecurityPolicyRule: %s", err)
+	}
 	return resourceComputePublicAdvertisedPrefixUpdate(d, meta)
 }
+
+
+
+url, err := tpgresource.ReplaceVars(d, config, "{{ComputeBasePath}}projects/{{project}}/global/publicAdvertisedPrefixes/{{name}}")
+	if err != nil {
+		return err
+	}
+
+	fingerPrint, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+		Config: config,
+		Method: "GET",
+		RawURL: url,
+		UserAgent: userAgent,
+	})
+	if err != nil {
+		return transport_tpg.HandleNotFoundError(err, d, fmt.Sprintf("ComputePublicAdvertisedPrefix %q", d.Get("fingerprint")))
+	}
