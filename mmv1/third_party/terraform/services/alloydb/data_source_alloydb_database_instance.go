@@ -32,13 +32,28 @@ func dataSourceAlloydbDatabaseInstanceRead(d *schema.ResourceData, meta interfac
 	// project, err := tpgresource.GetProject(d, config)
 	// if err != nil {
 	// 	return err
-	// }
+	// }	d.SetId(fmt.Sprintf("projects/%s/locations", project))
+	GET https://alloydb.googleapis.com/v1/{parent=projects/*/locations/*}/supportedDatabaseFlags
+	d.SetId(fmt.Sprintf("projects/%s/locations/%s/supportedDbFlags", project, location))
 
-	id, err := tpgresource.ReplaceVars(d, config, "{{cluster}}/instances/{{instance_id}}")
+	GET https://alloydb.googleapis.com/v1/{name=projects/*/locations/*}
+	d.SetId(fmt.Sprintf("projects/%s/locations", project))
+
+	GET https://alloydb.googleapis.com/v1/{name=projects/*/locations/*/clusters/*/instances/*}
+	projects/{project}/locations/{region}/clusters/{clusterId}
+	d.SetId(fmt.Sprintf("projects/%s/locations/%s/clusters/%s/instances/%s/", project, location))
+
+	id := fmt.Sprintf("projects/%s/instances/%s", project, location, d.Get("cluster").(string))
 	if err != nil {
-		return fmt.Errorf("Error constructing id: %s", err)
+		return err
 	}
 	d.SetId(id)
+
+	// id, err := tpgresource.ReplaceVars(d, config, "{{cluster}}/instances/{{instance_id}}")
+	// if err != nil {
+	// 	return fmt.Errorf("Error constructing id: %s", err)
+	// }
+	// d.SetId(id)
 
 	err = resourceAlloydbInstanceRead(d, meta)
 	if err != nil {
