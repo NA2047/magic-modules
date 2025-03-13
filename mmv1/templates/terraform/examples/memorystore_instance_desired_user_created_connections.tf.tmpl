@@ -130,9 +130,6 @@ resource "google_memorystore_instance" "{{$.PrimaryResourceId}}" {
   shard_count                 = 3
   location                    = "us-central1"
   deletion_protection_enabled = false
-  psc_config {
-    subnetworks               = [google_compute_subnetwork.subnet_network1.id]
-  }
 }
 
 resource "google_compute_subnetwork" "subnet_network2" {

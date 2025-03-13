@@ -74,7 +74,7 @@ resource "google_memorystore_instance" "{{$.PrimaryResourceId}}" {
   instance_id =  "{{index $.Vars "instance_name"}}"
   shard_count = 3
   desired_psc_auto_connections {
-    network    = google_compute_network.{{index $.Vars "subnet_network1_name"}}.id
+    network    = google_compute_network.network1.id
     project_id = data.google_project.project.project_id
   }
   location                    = "us-central1"

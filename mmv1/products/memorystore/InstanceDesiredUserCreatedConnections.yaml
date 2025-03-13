@@ -52,7 +52,7 @@ examples:
   - name: 'memorystore_instance_desired_user_created_connections'
     primary_resource_id: 'instance-user-conn'
     vars:
-      cluster_name: 'instance-user-conn'
+      instance_name: 'instance-user-conn'
       network1_name: 'net1'
       subnet_network1_name: 'subnet-net1'
       ip1_network1_name: 'ip1-net1'
@@ -68,7 +68,7 @@ examples:
   - name: 'memorystore_instance_desired_user_and_auto_created_connections'
     primary_resource_id: 'instance-user-auto-conn'
     vars:
-      cluster_name: 'instance-user-auto-conn'
+      instance_name: 'instance-user-auto-conn'
       network1_name: 'net1'
       subnet_network1_name: 'subnet-net1'
       policy_name: 'scpolicy'
