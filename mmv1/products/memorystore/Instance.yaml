@@ -79,6 +79,7 @@ virtual_fields:
     description: "Required. Immutable. User inputs for the auto-created
       PSC connections. "
     type: Array
+    immutable: true
     item_type:
       type: NestedObject
       properties:

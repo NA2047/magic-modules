@@ -7,7 +7,7 @@
 	billingProject = project
 
 	obj := make(map[string]interface{})
-    // not setting instanceEndpoints in obj
+    // not setting desiredUserEndpoints in obj
 
 
 	url, err := tpgresource.ReplaceVars(d, config, "{{"{{"}}MemorystoreBasePath{{"}}"}}projects/{{"{{"}}project{{"}}"}}/locations/{{"{{"}}region{{"}}"}}/instances/{{"{{"}}name{{"}}"}}")
@@ -17,8 +17,9 @@
 
 	log.Printf("[DEBUG] Updating InstanceDesiredUserCreatedConnections %q: %#v", d.Id(), obj)
 	headers := make(http.Header)
-
+ 
 	updateMask := []string{}
+	// for reference desiredUserEndpoints is a renaming of endpoints, and maps back to desiredUserEndpoints on the resource
 	updateMask = append(updateMask, "endpoints")
 	// updateMask is a URL parameter but not present in the schema, so ReplaceVars
 	// won't set it
