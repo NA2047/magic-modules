@@ -229,6 +229,199 @@ func TestAccMemorystoreInstance_updateEngineVersion(t *testing.T) {
 	})
 }
 
+// Validate that deletion protection enabled/disabled cluster is created updated
+func TestAccMemorystoreInstance_switchoverAndDetachSecondary(t *testing.T) {
+	t.Parallel()
+
+	context := map[string]interface{}{
+		"random_suffix":    acctest.RandString(t, 10),
+		"role":             "PRIMARY",
+		"primary_region":   "us-central1",
+		"secondary_region": "europe-west1",
+	}
+
+	piName := fmt.Sprintf("tf-test-prim-%d", acctest.RandInt(t))
+	siName := fmt.Sprintf("tf-test-sec-%d", acctest.RandInt(t))
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderBetaFactories(t),
+		CheckDestroy:             testAccCheckRedisClusterDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				// create primary and secondary clusters cluster
+				Config: testAccMemorystoreInstance_switchoverAndDetachSecondary(&InstanceParams{name: piName, replicaCount: 0, shardCount: 3, deletionProtectionEnabled: false, zoneDistributionMode: "MULTI_ZONE", shouldCreateSecondary: true, secondaryInstanceName: siName, icrRole: "SECONDARY"}),
+			},
+			{
+				ResourceName:            "google_memorystore_instance.test_secondary",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"psc_configs"},
+			},
+			{
+				// // Switchover to secondary cluster
+				Config: testAccMemorystoreInstance_switchoverAndDetachSecondary(&InstanceParams{name: piName, replicaCount: 0, shardCount: 3, deletionProtectionEnabled: false, zoneDistributionMode: "MULTI_ZONE", shouldCreateSecondary: true, secondaryInstanceName: siName, icrRole: "PRIMARY"}),
+			},
+			{
+				ResourceName:            "google_memorystore_instance.test_secondary",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"psc_configs"},
+			},
+			{
+				// Detach secondary cluster and delete the clusters
+				Config: testAccMemorystoreInstance_switchoverAndDetachSecondary(&InstanceParams{name: piName, replicaCount: 0, shardCount: 3, deletionProtectionEnabled: false, zoneDistributionMode: "MULTI_ZONE", shouldCreateSecondary: true, secondaryInstanceName: siName, icrRole: "NONE"}),
+			},
+		},
+	})
+}
+
+func testAccMemorystoreInstance_switchoverAndDetachSecondary(context map[string]interface{}) string {
+	return acctest.Nprintf(`
+
+// Primary instance
+resource "google_memorystore_instance" "primary_instance" {
+  instance_id                    = "tf-prime-instance-%{random_suffix}"
+  shard_count                    = 1
+  location                       = "%{primary_region}"
+  replica_count                  = 2
+  node_type                      = "SHARED_CORE_NANO"
+  transit_encryption_mode        = "TRANSIT_ENCRYPTION_DISABLED"
+  authorization_mode             = "AUTH_DISABLED"
+  engine_configs = {
+    maxmemory-policy             = "volatile-ttl"
+  }
+  zone_distribution_config {
+    mode                         = "SINGLE_ZONE"
+    zone                         = "%{primary_region}-b"
+  }
+
+// Cross instance replication config
+#   cross_instance_replication_config {
+#     instance_role                 = "SECONDARY"
+
+#   }
+  deletion_protection_enabled    = false
+  mode                           = "CLUSTER_DISABLED"
+  persistence_config {
+    mode                         = "RDB"
+    rdb_config {
+      rdb_snapshot_period        = "ONE_HOUR"
+      rdb_snapshot_start_time    = "2024-10-02T15:01:23Z"
+    }
+  }
+  labels = {
+    "abc" : "xyz"
+  }
+  depends_on                     = [google_network_connectivity_service_connection_policy.primary_policy]
+}
+
+
+
+resource "google_network_connectivity_service_connection_policy" "primary_policy" {
+	name                           = "tf-test-my-policy-primary-instance"
+	location                       = "%{primary_region}"
+	service_class                  = "gcp-memorystore-autopush"
+	description                    = "my basic service connection policy"
+	network                        = google_compute_network.primary_producer_net.id
+	psc_config {                 
+	  subnetworks                  = [google_compute_subnetwork.primary_producer_subnet.id]
+	}
+  }
+  
+  resource "google_compute_subnetwork" "primary_producer_subnet" {
+	name                           = "tf-test-my-subnet-primary-instanceploop"
+	ip_cidr_range                  = "10.0.1.0/29"
+	region                         = "%{primary_region}"
+	network                        = google_compute_network.primary_producer_net.id
+  }
+  
+  resource "google_compute_network" "primary_producer_net" {
+	name                           = "tf-test-my-network-primary-instanceploop"
+	auto_create_subnetworks        = false
+  }
+
+
+
+
+// Secondary instance
+resource "google_memorystore_instance" "secondary_instance" {
+  instance_id                    = "tf-second-instance-%{random_suffix}"
+  shard_count                    = 1
+  location                       = "%{secondary_region}"
+  replica_count                  = 2
+  node_type                      = "SHARED_CORE_NANO"
+  transit_encryption_mode        = "TRANSIT_ENCRYPTION_DISABLED"
+  authorization_mode             = "AUTH_DISABLED"
+  engine_configs = {
+    maxmemory-policy             = "volatile-ttl"
+  }
+  zone_distribution_config {
+    mode                         = "SINGLE_ZONE"
+    zone                         = "%{secondary_region}-b"
+  }
+  deletion_protection_enabled    = false
+  mode                           = "CLUSTER_DISABLED"
+  // Cross instance replication config
+  cross_instance_replication_config {
+    instance_role                 = "PRIMARY"
+    # primary_instance {
+    #   instance                  = google_memorystore_instance.primary_instance.id
+    # }
+    secondary_instances {
+        instance                  = google_memorystore_instance.primary_instance.id
+        }
+
+    # secondary_instances =  {
+    #     instance   = google_memorystore_instance.primary_instance.id
+    #     }
+
+  }
+  persistence_config {
+    mode                         = "RDB"
+    rdb_config {
+      rdb_snapshot_period        = "ONE_HOUR"
+      rdb_snapshot_start_time    = "2024-10-02T15:01:23Z"
+    }
+  }
+  labels = {
+    "abc" : "xyz"
+  }
+  depends_on                     = [google_network_connectivity_service_connection_policy.secondary_policy]
+
+}
+
+
+
+resource "google_network_connectivity_service_connection_policy" "secondary_policy" {
+  name                           = "tf-test-my-policy-secondary-instanceploop2"
+  location                       = "%{secondary_region}"
+  service_class                  = "gcp-memorystore-autopush"
+  description                    = "my basic service connection policy"
+  network                        = google_compute_network.secondary_producer_net.id
+  psc_config {                 
+    subnetworks                  = [google_compute_subnetwork.secondary_producer_subnet.id]
+  }
+}
+
+resource "google_compute_subnetwork" "secondary_producer_subnet" {
+  name                           = "tf-test-my-subnet-secondary-instanceploop2"
+  ip_cidr_range                  = "10.0.2.0/29"
+  region                         = "%{secondary_region}"
+  network                        = google_compute_network.secondary_producer_net.id
+}
+
+resource "google_compute_network" "secondary_producer_net" {
+  name                           = "tf-test-my-network-primary-instanceploop2"
+  auto_create_subnetworks        = false
+}
+
+data "google_project" "project" {
+}
+
+`, context)
+}
+
 // Validate that persistence config is updated for the cluster
 func TestAccMemorystoreInstance_updatePersistence(t *testing.T) {
 	t.Parallel()
@@ -348,6 +541,9 @@ type InstanceParams struct {
 	persistenceMode           string
 	engineVersion             string
 	userEndpointCount         int
+	shouldCreateSecondary     bool
+	secondaryInstanceName     string
+	icrRole                   string
 }
 
 func createMemorystoreInstanceEndpointsWithOneUserCreatedConnections(params *InstanceParams) string {
