@@ -233,11 +233,21 @@ func TestAccMemorystoreInstance_updateEngineVersion(t *testing.T) {
 func TestAccMemorystoreInstance_switchoverAndDetachSecondary(t *testing.T) {
 	t.Parallel()
 
-	context := map[string]interface{}{
+	context_create := map[string]interface{}{
+		"random_suffix":    acctest.RandString(t, 10),
+		"primary_role":     "PRIMARY",
+		"secondary_role":   "SECONDARY",
+		"primary_region":   "us-central1",
+		"secondary_region": "europe-west1",
+		"zone_distubution": "MULTI_ZONE",
+	}
+
+	context_switch := map[string]interface{}{
 		"random_suffix":    acctest.RandString(t, 10),
 		"role":             "PRIMARY",
 		"primary_region":   "us-central1",
 		"secondary_region": "europe-west1",
+		"zone_distubution": "MULTI_ZONE",
 	}
 
 	piName := fmt.Sprintf("tf-test-prim-%d", acctest.RandInt(t))
@@ -249,8 +259,10 @@ func TestAccMemorystoreInstance_switchoverAndDetachSecondary(t *testing.T) {
 		CheckDestroy:             testAccCheckRedisClusterDestroyProducer(t),
 		Steps: []resource.TestStep{
 			{
+
+				Config: testAccMemorystoreInstance_switchoverAndDetachSecondaryCreate(context_create),
 				// create primary and secondary clusters cluster
-				Config: testAccMemorystoreInstance_switchoverAndDetachSecondary(&InstanceParams{name: piName, replicaCount: 0, shardCount: 3, deletionProtectionEnabled: false, zoneDistributionMode: "MULTI_ZONE", shouldCreateSecondary: true, secondaryInstanceName: siName, icrRole: "SECONDARY"}),
+				// Config: testAccMemorystoreInstance_switchoverAndDetachSecondary(&InstanceParams{name: piName, replicaCount: 0, shardCount: 3, deletionProtectionEnabled: false, zoneDistributionMode: "MULTI_ZONE", shouldCreateSecondary: true, secondaryInstanceName: siName, icrRole: "SECONDARY"}),
 			},
 			{
 				ResourceName:            "google_memorystore_instance.test_secondary",
@@ -259,26 +271,23 @@ func TestAccMemorystoreInstance_switchoverAndDetachSecondary(t *testing.T) {
 				ImportStateVerifyIgnore: []string{"psc_configs"},
 			},
 			{
+				Config: testAccMemorystoreInstance_switchoverAndDetachSecondarySwitch(context_switch),
+
 				// // Switchover to secondary cluster
-				Config: testAccMemorystoreInstance_switchoverAndDetachSecondary(&InstanceParams{name: piName, replicaCount: 0, shardCount: 3, deletionProtectionEnabled: false, zoneDistributionMode: "MULTI_ZONE", shouldCreateSecondary: true, secondaryInstanceName: siName, icrRole: "PRIMARY"}),
+				// Config: testAccMemorystoreInstance_switchoverAndDetachSecondary(&InstanceParams{name: piName, replicaCount: 0, shardCount: 3, deletionProtectionEnabled: false, zoneDistributionMode: "MULTI_ZONE", shouldCreateSecondary: true, secondaryInstanceName: siName, icrRole: "PRIMARY"}),
 			},
 			{
 				ResourceName:            "google_memorystore_instance.test_secondary",
 				ImportState:             true,
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"psc_configs"},
-			},
-			{
-				// Detach secondary cluster and delete the clusters
-				Config: testAccMemorystoreInstance_switchoverAndDetachSecondary(&InstanceParams{name: piName, replicaCount: 0, shardCount: 3, deletionProtectionEnabled: false, zoneDistributionMode: "MULTI_ZONE", shouldCreateSecondary: true, secondaryInstanceName: siName, icrRole: "NONE"}),
 			},
 		},
 	})
 }
 
-func testAccMemorystoreInstance_switchoverAndDetachSecondary(context map[string]interface{}) string {
+func testAccMemorystoreInstance_switchoverAndDetachSecondaryCreate(context map[string]interface{}) string {
 	return acctest.Nprintf(`
-
 // Primary instance
 resource "google_memorystore_instance" "primary_instance" {
   instance_id                    = "tf-prime-instance-%{random_suffix}"
@@ -292,24 +301,17 @@ resource "google_memorystore_instance" "primary_instance" {
     maxmemory-policy             = "volatile-ttl"
   }
   zone_distribution_config {
-    mode                         = "SINGLE_ZONE"
+    mode                         = "%{zone_distubution}"
     zone                         = "%{primary_region}-b"
   }
 
-// Cross instance replication config
-#   cross_instance_replication_config {
-#     instance_role                 = "SECONDARY"
+// replication config
+   cross_instance_replication_config { 
+      instance_role              = "%{primary_role}"
+  }
 
-#   }
   deletion_protection_enabled    = false
   mode                           = "CLUSTER_DISABLED"
-  persistence_config {
-    mode                         = "RDB"
-    rdb_config {
-      rdb_snapshot_period        = "ONE_HOUR"
-      rdb_snapshot_start_time    = "2024-10-02T15:01:23Z"
-    }
-  }
   labels = {
     "abc" : "xyz"
   }
@@ -317,38 +319,107 @@ resource "google_memorystore_instance" "primary_instance" {
 }
 
 
-
+// Primary policy
 resource "google_network_connectivity_service_connection_policy" "primary_policy" {
-	name                           = "tf-test-my-policy-primary-instance"
-	location                       = "%{primary_region}"
-	service_class                  = "gcp-memorystore-autopush"
-	description                    = "my basic service connection policy"
-	network                        = google_compute_network.primary_producer_net.id
+	name                          = "tf-test-prime-policy-%{random_suffix}"
+	location                      = "%{primary_region}"
+	service_class                 = "gcp-memorystore"
+	network                       = google_compute_network.primary_producer_net.id
 	psc_config {                 
-	  subnetworks                  = [google_compute_subnetwork.primary_producer_subnet.id]
+	  subnetworks                 = [google_compute_subnetwork.primary_producer_subnet.id]
 	}
   }
-  
+
+  // Primary subnet
   resource "google_compute_subnetwork" "primary_producer_subnet" {
-	name                           = "tf-test-my-subnet-primary-instanceploop"
+	name                           = "tf-test-prime-subnet-%{random_suffix}"
 	ip_cidr_range                  = "10.0.1.0/29"
 	region                         = "%{primary_region}"
 	network                        = google_compute_network.primary_producer_net.id
   }
-  
+
+  // Primary vpc
   resource "google_compute_network" "primary_producer_net" {
-	name                           = "tf-test-my-network-primary-instanceploop"
+	name                           = "tf-test-prime-net-%{random_suffix}"
 	auto_create_subnetworks        = false
   }
 
-
-
-
 // Secondary instance
 resource "google_memorystore_instance" "secondary_instance" {
-  instance_id                    = "tf-second-instance-%{random_suffix}"
+  instance_id                     = "tf-test-sec-instance-%{random_suffix}"
+  shard_count                     = 1
+  location                        = "%{secondary_region}"
+  replica_count                   = 2
+  node_type                       = "SHARED_CORE_NANO"
+  transit_encryption_mode         = "TRANSIT_ENCRYPTION_DISABLED"
+  authorization_mode              = "AUTH_DISABLED"
+  engine_configs = {
+    maxmemory-policy              = "volatile-ttl"
+  }
+  zone_distribution_config {
+    mode                          = "%{zone_distubution}"
+    zone                          = "%{secondary_region}-b"
+  }
+  deletion_protection_enabled     = false
+  mode                            = "CLUSTER_DISABLED"
+  // Cross instance replication config
+  cross_instance_replication_config {
+    instance_role                 = "%{secondary_role}"
+  }
+     primary_instance {
+       instance                   = google_memorystore_instance.primary_instance.id
+     }
+     secondary_instances {
+        instance                  = google_memorystore_instance.primary_instance.id
+        }
+
+  }
+  labels = {
+    "abc" : "xyz"
+  }
+  depends_on                      = [google_network_connectivity_service_connection_policy.secondary_policy]
+
+}
+
+// Secondary policy
+resource "google_network_connectivity_service_connection_policy" "secondary_policy" {
+  name                            = "tf-test-sec-ploicy-%{random_suffix}"
+  location                        = "%{secondary_region}"
+  service_class                   = "gcp-memorystore-autopush"
+  description                     = "my basic service connection policy"
+  network                         = google_compute_network.secondary_producer_net.id
+  psc_config {                 
+    subnetworks                   = [google_compute_subnetwork.secondary_producer_subnet.id]
+  }
+}
+
+// Secondary subnet
+resource "google_compute_subnetwork" "secondary_producer_subnet" {
+  name                            = "tf-test-sec-subnet-%{random_suffix}"
+  ip_cidr_range                   = "10.0.2.0/29"
+  region                          = "%{secondary_region}"
+  network                         = google_compute_network.secondary_producer_net.id
+}
+
+// Secondary vpc
+resource "google_compute_network" "secondary_producer_net" {
+  name                            = "tf-test-sec-net-%{random_suffix}"
+  auto_create_subnetworks         = false
+}
+
+data "google_project" "project" {
+}
+
+`, context)
+}
+
+func testAccMemorystoreInstance_switchoverAndDetachSecondarySwitch(context map[string]interface{}) string {
+	return acctest.Nprintf(`
+// Primary instance
+resource "google_memorystore_instance" "primary_instance" {
+  instance_id                    = "tf-prime-instance-%{random_suffix}"
   shard_count                    = 1
-  location                       = "%{secondary_region}"
+  location                       = "%{primary_region}"
   replica_count                  = 2
   node_type                      = "SHARED_CORE_NANO"
   transit_encryption_mode        = "TRANSIT_ENCRYPTION_DISABLED"
@@ -357,63 +428,110 @@ resource "google_memorystore_instance" "secondary_instance" {
     maxmemory-policy             = "volatile-ttl"
   }
   zone_distribution_config {
-    mode                         = "SINGLE_ZONE"
-    zone                         = "%{secondary_region}-b"
+    mode                         = "%{zone_distubution}"
+    zone                         = "%{primary_region}-b"
   }
+
+// replication config
+   cross_instance_replication_config { 
+      instance_role              = "%{primary_role}"
+  }
+
   deletion_protection_enabled    = false
   mode                           = "CLUSTER_DISABLED"
+  labels = {
+    "abc" : "xyz"
+  }
+  depends_on                     = [google_network_connectivity_service_connection_policy.primary_policy]
+}
+
+
+// Primary policy
+resource "google_network_connectivity_service_connection_policy" "primary_policy" {
+	name                          = "tf-test-prime-policy-%{random_suffix}"
+	location                      = "%{primary_region}"
+	service_class                 = "gcp-memorystore"
+	network                       = google_compute_network.primary_producer_net.id
+	psc_config {                 
+	  subnetworks                 = [google_compute_subnetwork.primary_producer_subnet.id]
+	}
+  }
+
+  // Primary subnet
+  resource "google_compute_subnetwork" "primary_producer_subnet" {
+	name                           = "tf-test-prime-subnet-%{random_suffix}"
+	ip_cidr_range                  = "10.0.1.0/29"
+	region                         = "%{primary_region}"
+	network                        = google_compute_network.primary_producer_net.id
+  }
+
+  // Primary vpc
+  resource "google_compute_network" "primary_producer_net" {
+	name                           = "tf-test-prime-net-%{random_suffix}"
+	auto_create_subnetworks        = false
+  }
+
+// Secondary instance
+resource "google_memorystore_instance" "secondary_instance" {
+  instance_id                     = "tf-test-sec-instance-%{random_suffix}"
+  shard_count                     = 1
+  location                        = "%{secondary_region}"
+  replica_count                   = 2
+  node_type                       = "SHARED_CORE_NANO"
+  transit_encryption_mode         = "TRANSIT_ENCRYPTION_DISABLED"
+  authorization_mode              = "AUTH_DISABLED"
+  engine_configs = {
+    maxmemory-policy              = "volatile-ttl"
+  }
+  zone_distribution_config {
+    mode                          = "%{zone_distubution}"
+    zone                          = "%{secondary_region}-b"
+  }
+  deletion_protection_enabled     = false
+  mode                            = "CLUSTER_DISABLED"
   // Cross instance replication config
   cross_instance_replication_config {
-    instance_role                 = "PRIMARY"
-    # primary_instance {
-    #   instance                  = google_memorystore_instance.primary_instance.id
-    # }
-    secondary_instances {
+    instance_role                 = "%{secondary_role}"
+  }
+     primary_instance {
+       instance                   = google_memorystore_instance.primary_instance.id
+     }
+     secondary_instances {
         instance                  = google_memorystore_instance.primary_instance.id
         }
 
-    # secondary_instances =  {
-    #     instance   = google_memorystore_instance.primary_instance.id
-    #     }
-
-  }
-  persistence_config {
-    mode                         = "RDB"
-    rdb_config {
-      rdb_snapshot_period        = "ONE_HOUR"
-      rdb_snapshot_start_time    = "2024-10-02T15:01:23Z"
-    }
   }
   labels = {
     "abc" : "xyz"
   }
-  depends_on                     = [google_network_connectivity_service_connection_policy.secondary_policy]
+  depends_on                      = [google_network_connectivity_service_connection_policy.secondary_policy]
 
 }
 
-
-
+// Secondary policy
 resource "google_network_connectivity_service_connection_policy" "secondary_policy" {
-  name                           = "tf-test-my-policy-secondary-instanceploop2"
-  location                       = "%{secondary_region}"
-  service_class                  = "gcp-memorystore-autopush"
-  description                    = "my basic service connection policy"
-  network                        = google_compute_network.secondary_producer_net.id
+  name                            = "tf-test-sec-ploicy-%{random_suffix}"
+  location                        = "%{secondary_region}"
+  service_class                   = "gcp-memorystore-autopush"
+  description                     = "my basic service connection policy"
+  network                         = google_compute_network.secondary_producer_net.id
   psc_config {                 
-    subnetworks                  = [google_compute_subnetwork.secondary_producer_subnet.id]
+    subnetworks                   = [google_compute_subnetwork.secondary_producer_subnet.id]
   }
 }
 
+// Secondary subnet
 resource "google_compute_subnetwork" "secondary_producer_subnet" {
-  name                           = "tf-test-my-subnet-secondary-instanceploop2"
-  ip_cidr_range                  = "10.0.2.0/29"
-  region                         = "%{secondary_region}"
-  network                        = google_compute_network.secondary_producer_net.id
+  name                            = "tf-test-sec-subnet-%{random_suffix}"
+  ip_cidr_range                   = "10.0.2.0/29"
+  region                          = "%{secondary_region}"
+  network                         = google_compute_network.secondary_producer_net.id
 }
 
+// Secondary vpc
 resource "google_compute_network" "secondary_producer_net" {
-  name                           = "tf-test-my-network-primary-instanceploop2"
-  auto_create_subnetworks        = false
+  name                            = "tf-test-sec-net-%{random_suffix}"
+  auto_create_subnetworks         = false
 }
 
 data "google_project" "project" {
