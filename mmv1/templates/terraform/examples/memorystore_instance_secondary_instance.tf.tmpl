@@ -6,8 +6,8 @@ resource "google_memorystore_instance" "primary_instance" {
     network                      = google_compute_network.primary_producer_net.id
     project_id                   = data.google_project.project.project_id
   }
-  location                       = "us-central1"
-  replica_count                  = 2
+  location                       = "asia-east1"
+  replica_count                  = 1
   node_type                      = "SHARED_CORE_NANO"
   transit_encryption_mode        = "TRANSIT_ENCRYPTION_DISABLED"
   authorization_mode             = "AUTH_DISABLED"
@@ -16,9 +16,8 @@ resource "google_memorystore_instance" "primary_instance" {
   }
   zone_distribution_config {
     mode                         = "SINGLE_ZONE"
-    zone                         = "us-central1-b"
+    zone                         = "asia-east1-c"
   }
-  engine_version                 = "VALKEY_7_2"
   deletion_protection_enabled    = {{index $.Vars "primary_instance_deletion_protection_enabled"}}
   mode                           = "CLUSTER_DISABLED"
   persistence_config {
@@ -40,8 +39,8 @@ resource "google_memorystore_instance" "primary_instance" {
 
 resource "google_network_connectivity_service_connection_policy" "primary_policy" {
   name                           = "{{index $.Vars "primary_instance_policy_name"}}"
-  location                       = "us-central1"
-  service_class                  = "gcp-memorystore-autopush"
+  location                       = "asia-east1"
+  service_class                  = "gcp-memorystore"
   description                    = "my basic service connection policy"
   network                        = google_compute_network.primary_producer_net.id
   psc_config {                 
@@ -52,7 +51,7 @@ resource "google_network_connectivity_service_connection_policy" "primary_policy
 resource "google_compute_subnetwork" "primary_producer_subnet" {
   name                           = "{{index $.Vars "primary_instance_subnet_name"}}"
   ip_cidr_range                  = "10.0.1.0/29"
-  region                         = "us-central1"
+  region                         = "asia-east1"
   network                        = google_compute_network.primary_producer_net.id
 }
 
@@ -69,8 +68,8 @@ resource "google_memorystore_instance" "secondary_instance" {
     network                      = google_compute_network.secondary_producer_net.id
     project_id                   = data.google_project.project.project_id
   }
-  location                       = "europe-west1"
-  replica_count                  = 2
+  location                       = "europe-north1"
+  replica_count                  = 1
   node_type                      = "SHARED_CORE_NANO"
   transit_encryption_mode        = "TRANSIT_ENCRYPTION_DISABLED"
   authorization_mode             = "AUTH_DISABLED"
@@ -79,9 +78,8 @@ resource "google_memorystore_instance" "secondary_instance" {
   }
   zone_distribution_config {
     mode                         = "SINGLE_ZONE"
-    zone                         = "europe-west1-b"
+    zone                         = "europe-north1-c"
   }
-  engine_version                 = "VALKEY_7_2"
   deletion_protection_enabled    = {{index $.Vars "secondary_instance_deletion_protection_enabled"}}
   mode                           = "CLUSTER_DISABLED"
   // Cross instance replication config
@@ -101,7 +99,7 @@ resource "google_memorystore_instance" "secondary_instance" {
   labels = {
     "abc" : "xyz"
   }
-  depends_on                     = [google_network_connectivity_service_connection_policy.secondary_policy, google_memorystore_instance.primary_instance]
+  depends_on                     = [google_network_connectivity_service_connection_policy.secondary_policy]
 
   lifecycle {
     prevent_destroy              = {{index $.Vars "secondary_instance_prevent_destroy"}}
@@ -110,8 +108,8 @@ resource "google_memorystore_instance" "secondary_instance" {
 
 resource "google_network_connectivity_service_connection_policy" "secondary_policy" {
   name                           = "{{index $.Vars "secondary_instance_policy_name"}}"
-  location                       = "europe-west1"
-  service_class                  = "gcp-memorystore-autopush"
+  location                       = "europe-north1"
+  service_class                  = "gcp-memorystore"
   description                    = "my basic service connection policy"
   network                        = google_compute_network.secondary_producer_net.id
   psc_config {                 
@@ -122,7 +120,7 @@ resource "google_network_connectivity_service_connection_policy" "secondary_poli
 resource "google_compute_subnetwork" "secondary_producer_subnet" {
   name                           = "{{index $.Vars "secondary_instance_subnet_name"}}"
   ip_cidr_range                  = "10.0.2.0/29"
-  region                         = "europe-west1"
+  region                         = "europe-north1"
   network                        = google_compute_network.secondary_producer_net.id
 }
 
