@@ -195,8 +195,20 @@ properties:
             output: true
   - name: 'uid'
     type: String
-    description: "Output only. System assigned, unique identifier for the instance. "
+    description: "Output only. System assigned unique identifier for the instance. "
     output: true
+  - name: 'gcsSource'
+    type: NestedObject
+    description: |
+      Backups stored in Cloud Storage buckets. The Cloud Storage buckets need to be the same region as the instances.
+    properties:
+      - name: 'uris'
+        type: Array
+        description: |
+          URIs of the GCS objects to import. Example: gs://bucket1/object1 gs://bucket2/folder2/object2
+        required: true
+        item_type:
+          type: String
   - name: 'replicaCount'
     type: Integer
     description:
