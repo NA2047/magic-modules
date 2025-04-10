@@ -120,6 +120,26 @@ virtual_fields:
             "Required. The consumer network where the IP address resides, in
             the form of\nprojects/{project_id}/global/networks/{network_id}. "
           required: true
+  - name: 'desired_auto_endpoints'
+    description: "Immutable. User inputs for the auto-created
+      PSC connections. "
+    type: Array
+    immutable: true
+    item_type:
+      type: NestedObject
+      properties:
+        - type: String
+          name: project_id
+          description:
+            "Required. The consumer project_id where the forwarding rule is
+            created from. "
+          required: true
+        - type: String
+          name: network
+          description:
+            "Required. The consumer network where the IP address resides, in
+            the form of\nprojects/{project_id}/global/networks/{network_id}. "
+          required: true
 parameters:
   - name: 'location'
     type: String
@@ -670,6 +690,12 @@ properties:
           description:
             "Service attachment URI which your self-created PscConnection should use as target."
           output: true
+  - name: "InstanceEndpoint"
+    type: Array
+      description:
+        "Output only. User inputs and resource details of the auto-created
+        PSC connections. "
+    output: true
   - name: 'pscAutoConnections'
     type: Array
     description:
