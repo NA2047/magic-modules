@@ -42,4 +42,50 @@ for _, raw := range connections {
 }
 
 d.Set("desired_psc_auto_connections", transformed)
+
+
+// Retrieve endpoints from API response
+v, ok = res["endpoints"]
+if !ok {
+	if _, endpointsFound := res["endpoints"]; endpointsFound {
+		return res, nil // For Cluster Disabled instances, we would have 'endpoints' instead of 'pscAutoConnections'
+	}
+	return res, nil
+}
+
+endpoints, ok = v.([]interface{})
+if !ok {
+	return nil, fmt.Errorf("endpoints is not an array")
+}
+
+transformed = make([]interface{}, 0, len(endpoints))
+uniqueConnections = make(map[string]bool) // Track unique project+network combos
+
+for _, raw := range endpoints {
+	connectionData, ok := raw.(map[string]interface{})
+	if !ok || len(connectionData) < 1 {
+		return nil, fmt.Errorf("Invalid or empty endpoint data: %v", raw)
+	}
+
+	projectID, ok := connectionData["projectId"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid project ID in psc connection: %v", connectionData)
+	}
+
+	networkID, ok := connectionData["network"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid network ID in psc connection: %v", connectionData)
+	}
+
+	uniqueKey := projectID + networkID
+	if !uniqueConnections[uniqueKey] { // Check for uniqueness
+		uniqueConnections[uniqueKey] = true
+		transformed = append(transformed, map[string]interface{}{
+			"project_id": projectID,
+			"network":    networkID,
+		})
+	}
+}
+
+d.Set("desired_auto_created_endpoints", transformed)
 return res, nil

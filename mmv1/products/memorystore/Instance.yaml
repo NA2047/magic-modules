@@ -101,7 +101,7 @@ examples:
       'secondary_instance_prevent_destroy': 'false'
 virtual_fields:
   - name: 'desired_psc_auto_connections'
-    description: "Immutable. User inputs for the auto-created
+    description: "*Deprected* User inputs for the auto-created
       PSC connections. "
     type: Array
     immutable: true
@@ -120,8 +120,8 @@ virtual_fields:
             "Required. The consumer network where the IP address resides, in
             the form of\nprojects/{project_id}/global/networks/{network_id}. "
           required: true
-  - name: 'desired_auto_endpoints'
-    description: "Immutable. User inputs for the auto-created
+  - name: 'desired_auto_created_endpoints'
+    description: "User inputs for the auto-created
       PSC connections. "
     type: Array
     immutable: true
@@ -569,6 +569,59 @@ properties:
                     description:
                       "Output only. Ports of the exposed endpoint."
                     output: true
+              - name: 'pscConnection'
+                type: NestedObject
+                description: "Detailed information of a PSC connection that is created through service connectivity automation."
+                properties:
+                  - name: 'pscConnectionId'
+                    type: String
+                    description:
+                      "Output only. The PSC connection id of the forwarding rule connected
+                      to the\nservice attachment. "
+                    output: true
+                  - name: 'ipAddress'
+                    type: String
+                    description:
+                      "Output only. The IP allocated on the consumer network for the
+                      PSC forwarding rule. "
+                    output: true
+                  - name: 'forwardingRule'
+                    type: String
+                    description: "Output only. The URI of the consumer side forwarding rule.\nFormat:\nprojects/{project}/regions/{region}/forwardingRules/{forwarding_rule} "
+                    output: true
+                  - name: 'projectId'
+                    type: String
+                    description:
+                      "Output only. The consumer project_id where the forwarding rule is
+                      created from. "
+                    output: true
+                  - name: 'network'
+                    type: String
+                    description:
+                      "Output only. The consumer network where the IP address resides, in
+                      the form of\nprojects/{project_id}/global/networks/{network_id}. "
+                    output: true
+                  - name: 'serviceAttachment'
+                    type: String
+                    description:
+                      "Output only. The service attachment which is the target of the PSC connection, in the form of
+                      projects/{project-id}/regions/{region}/serviceAttachments/{service-attachment-id}."
+                    output: true
+                  - name: 'connectionType'
+                    type: Enum
+                    description:
+                      "Output Only. Type of a PSC Connection.
+                      \n Possible values:\n CONNECTION_TYPE_DISCOVERY \n CONNECTION_TYPE_PRIMARY \n CONNECTION_TYPE_READER"
+                    output: true
+                    enum_values:
+                      - 'CONNECTION_TYPE_READER'
+                      - 'CONNECTION_TYPE_PRIMARY'
+                      - 'CONNECTION_TYPE_DISCOVERY'
+                  - name: 'port'
+                    type: Integer
+                    description:
+                      "Output only. Ports of the exposed endpoint."
+                    output: true
   - name: 'crossInstanceReplicationConfig'
     type: NestedObject
     description: Cross instance replication config
@@ -690,12 +743,6 @@ properties:
           description:
             "Service attachment URI which your self-created PscConnection should use as target."
           output: true
-  - name: "InstanceEndpoint"
-    type: Array
-      description:
-        "Output only. User inputs and resource details of the auto-created
-        PSC connections. "
-    output: true
   - name: 'pscAutoConnections'
     type: Array
     description:

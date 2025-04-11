@@ -31,4 +31,31 @@ if obj["automatedBackupConfig"] == nil {
     automatedBackupConfigProp, _ := expandMemorystoreInstanceAutomatedBackupConfig(d.Get("automated_backup_config"), d, config)
     obj["automatedBackupConfig"] = automatedBackupConfigProp
 }
+
+
+v, ok = d.GetOk("desired_auto_created_endpoints")
+if !ok {
+    return obj, nil // No desired endpoints, nothing to update
+}
+l := v.([]interface{})
+for _, raw := range l {
+    if raw == nil {
+        continue
+    }
+    desiredEndpoint := raw.(map[string]interface{})
+    connectionReq := make(map[string]interface{})
+
+    projectId := desiredEndpoint["project_id"]
+    if val := reflect.ValueOf(projectId); val.IsValid() && !tpgresource.IsEmptyValue(val) {
+        connectionReq["projectId"] = projectId
+    }
+
+    network := desiredEndpoint["network"]
+    if val := reflect.ValueOf(network); val.IsValid() && !tpgresource.IsEmptyValue(val) {
+        connectionReq["network"] = network
+    }
+
+    req = append(req, connectionReq)
+}
+
 return obj, nil
