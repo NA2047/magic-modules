@@ -16,6 +16,10 @@ name: 'CloudFunction'
 legacy_name: 'google_cloudfunctions_function'
 description: |
   A Cloud Function that contains user computation executed in response to an event.
+references:
+  guides:
+    'Official Documentation': 'https://cloud.google.com/functions'
+  api: 'https://cloud.google.com/functions/docs/reference/rest'
 exclude_resource: true
 docs:
 id_format: 'projects/{{project}}/locations/{{region}}/functions/{{cloud_function}}'
