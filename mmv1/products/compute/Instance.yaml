@@ -16,6 +16,10 @@ name: 'Instance'
 kind: 'compute#instance'
 description: |
   An instance is a virtual machine (VM) hosted on Google's infrastructure.
+references:
+  guides:
+    'Creating and Starting a VM Instance': 'https://cloud.google.com/compute/docs/instances/create-start-instance'
+  api: 'https://cloud.google.com/compute/docs/reference/rest/v1/instances'
 exclude_resource: true
 docs:
 base_url: 'projects/{{project}}/zones/{{zone}}/instances'
