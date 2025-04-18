@@ -21,6 +21,7 @@ description: |
   Access Approval enables you to require your explicit approval whenever Google support and engineering need to access your customer content.
 references:
   guides:
+    'Access Approval Overview': 'https://cloud.google.com/access-approval/docs/overview'
   api: 'https://cloud.google.com/access-approval/docs/reference/rest/v1/projects'
 docs:
 base_url: 'projects/{{project_id}}/accessApprovalSettings'
