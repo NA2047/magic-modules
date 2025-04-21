@@ -18,6 +18,9 @@ func ResourceGoogleServiceAccountKey() *schema.Resource {
 		Create: resourceGoogleServiceAccountKeyCreate,
 		Read:   resourceGoogleServiceAccountKeyRead,
 		Delete: resourceGoogleServiceAccountKeyDelete,
+		Importer: &schema.ResourceImporter{
+			State: resourceGoogleServiceAccountKeyImport,
+		},
 		Schema: map[string]*schema.Schema{
 			// Required
 			"service_account_id": {
@@ -219,3 +222,72 @@ func resourceGoogleServiceAccountKeyDelete(d *schema.ResourceData, meta interfac
 	d.SetId("")
 	return nil
 }
+
+// func resourceGoogleServiceAccountKeyImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+// 	config := meta.(*transport_tpg.Config)
+// 	if err := tpgresource.ParseImportId([]string{
+// 		"projects/(?P<project>[^/]+)/serviceAccounts/(?P<service_account_email>[^/]+)/keys/(?P<key_id>[^/]+)",
+// 		"(?P<project>[^/]+)/(?P<service_account_email>[^/]+)/(?P<key_id>[^/]+)",
+// 		"(?P<service_account_email>[^/]+)/(?P<key_id>[^/]+)",
+// 	}, d, config); err != nil {
+// 		return nil, err
+// 	}
+
+// 	// // Replace import id for the resource id
+// 	// id, err := tpgresource.ReplaceVars(d, config, "{{key_id}}")
+// 	// if err != nil {
+// 	// 	return nil, fmt.Errorf("Error constructing id: %s", err)
+// 	// }
+// 	// d.SetId(id)
+
+// 	// Set the service account ID in the format expected by the resource
+// 	serviceAccountId, err := tpgresource.ReplaceVars(d, config, "projects/{{project}}/serviceAccounts/{{service_account_email}}/keys/{{key_id}}")
+// 	if err != nil {
+// 		return nil, fmt.Errorf("Error constructing service account id: %s", err)
+// 	}
+// 	// if err := d.Set("service_account_id", serviceAccountId); err != nil {
+// 	// 	return nil, fmt.Errorf("Error setting service_account_id: %s", err)
+// 	// }
+
+// 	return []*schema.ResourceData{d}, nil
+// }
+
+func resourceGoogleServiceAccountImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+	config := meta.(*transport_tpg.Config)
+	if err := tpgresource.ParseImportId([]string{
+		"projects/(?P<project>[^/]+)/serviceAccounts/(?P<service_account_email>[^/]+)/keys/(?P<key_id>[^/]+)",
+		"(?P<project>[^/]+)/(?P<service_account_email>[^/]+)/(?P<key_id>[^/]+)",
+		"(?P<service_account_email>[^/]+)/(?P<key_id>[^/]+)",
+	}, d, config); err != nil {
+		return nil, err
+	}
+
+	// Replace import id for the resource id
+	id, err := tpgresource.ReplaceVars(d, config, "projects/{{project}}/serviceAccounts/{{service_account_id}}/keys/{{key_id}}")
+	if err != nil {
+		return nil, fmt.Errorf("Error constructing id: %s", err)
+	}
+	d.SetId(id)
+
+	return []*schema.ResourceData{d}, nil
+}
+
+// func resourceStorageHmacKeyImport(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+// 	config := meta.(*transport_tpg.Config)
+// 	if err := tpgresource.ParseImportId([]string{
+// 		"^projects/(?P<project>[^/]+)/hmacKeys/(?P<access_id>[^/]+)$",
+// 		"^(?P<project>[^/]+)/(?P<access_id>[^/]+)$",
+// 		"^(?P<access_id>[^/]+)$",
+// 	}, d, config); err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Replace import id for the resource id
+// 	id, err := tpgresource.ReplaceVars(d, config, "projects/{{project}}/hmacKeys/{{access_id}}")
+// 	if err != nil {
+// 		return nil, fmt.Errorf("Error constructing id: %s", err)
+// 	}
+// 	d.SetId(id)
+
+// 	return []*schema.ResourceData{d}, nil
+// }

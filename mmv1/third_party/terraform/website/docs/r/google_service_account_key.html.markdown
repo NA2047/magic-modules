@@ -121,4 +121,18 @@ A timestamp in RFC3339 UTC "Zulu" format, accurate to nanoseconds. Example: "201
 
 ## Import
 
-This resource does not support import.
+Service account keys can be imported using the `id`, e.g.
+
+```
+$ terraform import google_service_account_key.mykey projects/my-project/serviceAccounts/my-service-account@my-project.iam.gserviceaccount.com/keys/key-id
+```
+
+The following formats are also supported:
+
+```
+$ terraform import google_service_account_key.mykey my-project/my-service-account@my-project.iam.gserviceaccount.com/key-id
+```
+
+```
+$ terraform import google_service_account_key.mykey my-service-account@my-project.iam.gserviceaccount.com/key-id
+```
