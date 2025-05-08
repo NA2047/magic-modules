@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-provider-google/google/acctest"
 )
 
-func TestAccLustreInstance_update(t *testing.T) {
+func TestAccLustreInstance_basic(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -22,13 +22,12 @@ func TestAccLustreInstance_update(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccLustreInstance_full(context),
+				Config: testAccLustreInstance_basic(context),
 			},
 			{
-				ResourceName:            "google_lustre_instance.instance",
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"instance_id", "labels", "gke_support_enabled", "location", "terraform_labels"},
+				ResourceName:      "google_lustre_instance.instance",
+				ImportState:       true,
+				ImportStateVerify: true,
 			},
 			{
 				Config: testAccLustreInstance_update(context),
@@ -51,61 +50,45 @@ func TestAccLustreInstance_update(t *testing.T) {
 	})
 }
 
-func testAccLustreInstance_full(context map[string]interface{}) string {
+func testAccLustreInstance_basic(context map[string]interface{}) string {
 	return acctest.Nprintf(`
-resource "google_lustre_instance" "instance" {
-  instance_id         = "tf-test-my-instance%{random_suffix}"
-  location            = "us-central1-a"
-  filesystem          = "testfs"
-	network             = data.google_compute_network.lustre-network.id
-  gke_support_enabled = false
-  capacity_gib        = 18000
-	timeouts {
-		create = "120m"
-	}
+resource "google_parallelstore_instance" "instance" {
+  instance_id               = "instance%{random_suffix}"
+  location                  = "us-central1-a"
+  description               = "test instance"
+  capacity_gib              = 12000
+  deployment_type           = "SCRATCH"
+  network                   = google_compute_network.network.name
+  reserved_ip_range         = google_compute_global_address.private_ip_alloc.name
+  file_stripe_level         = "FILE_STRIPE_LEVEL_MIN"
+  directory_stripe_level    = "DIRECTORY_STRIPE_LEVEL_MIN"
+  depends_on                = [google_service_networking_connection.default]
 }
 
-// This example assumes this network already exists.
-// The API creates a tenant network per network authorized for a
-// Lustre instance and that network is not deleted when the user-created
-// network (authorized_network) is deleted, so this prevents issues
-// with tenant network quota.
-// If this network hasn't been created and you are using this example in your
-// config, add an additional network resource or change
-// this from "data"to "resource"
+resource "google_compute_network" "network" {
+  name                      = "network%{random_suffix}"
+  auto_create_subnetworks   = true
+  mtu                       = 8896
+}
+
+# Create an IP address
+resource "google_compute_global_address" "private_ip_alloc" {
+  name                      = "address%{random_suffix}"
+  purpose                   = "VPC_PEERING"
+  address_type              = "INTERNAL"
+  prefix_length             = 24
+  network                   = google_compute_network.network.id
+}
+
+# Create a private connection
+resource "google_service_networking_connection" "default" {
+  network                   = google_compute_network.network.id
+  service                   = "servicenetworking.googleapis.com"
+  reserved_peering_ranges   = [google_compute_global_address.private_ip_alloc.name]
+}
+
 data "google_compute_network" "lustre-network" {
-  name = "%{network_name}"
-}
-`, context)
-}
-
-func testAccLustreInstance_update(context map[string]interface{}) string {
-	return acctest.Nprintf(`
-resource "google_lustre_instance" "instance" {
-  instance_id         = "tf-test-my-instance%{random_suffix}"
-  location            = "us-central1-a"
-  filesystem          = "testfs"
-  capacity_gib        = 18000
-  network             = data.google_compute_network.lustre-network.id
-	description         = "test-description"
-	labels              = {
-    test = "test-label"
-  }
-	timeouts {
-		create = "120m"
-  }
-}
-
-// This example assumes this network already exists.
-// The API creates a tenant network per network authorized for a
-// Lustre instance and that network is not deleted when the user-created
-// network (authorized_network) is deleted, so this prevents issues
-// with tenant network quota.
-// If this network hasn't been created and you are using this example in your
-// config, add an additional network resource or change
-// this from "data"to "resource"
-data "google_compute_network" "lustre-network" {
-  name = "%{network_name}"
+  instance_id                = google_parallelstore_instance.instance.id
 }
 `, context)
 }
