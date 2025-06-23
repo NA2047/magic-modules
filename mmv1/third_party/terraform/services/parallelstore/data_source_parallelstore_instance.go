@@ -15,7 +15,7 @@ func DataSourceParallelstoreInstance() *schema.Resource {
 	dsSchema := tpgresource.DatasourceSchemaFromResourceSchema(ResourceParallelstoreInstance().Schema)
 
 	// Set 'Required' schema elements
-	tpgresource.AddRequiredFieldsToSchema(dsSchema, "name")
+	tpgresource.AddRequiredFieldsToSchema(dsSchema, "instance_id")
 	// Set 'Optional' schema elements
 	tpgresource.AddOptionalFieldsToSchema(dsSchema, "project", "location")
 
