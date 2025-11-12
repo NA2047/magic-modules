@@ -82,6 +82,21 @@ properties:
     description: |
       Creation timestamp in RFC3339 text format.
     output: true
+  - name: "selfLinkWithId"
+    type: String
+    description: |
+      Server-defined URL for this resource with the resource id.
+    output: true
+  - name: "state"
+    type: Enum
+    description: |
+      The status of storage pool creation.
+    output: true
+    enum_values:
+      - "CREATING"
+      - "FAILED"
+      - "READY"
+      - "DELETING"
   - name: "name"
     type: String
     description: |
