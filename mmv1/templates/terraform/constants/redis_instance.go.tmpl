@@ -37,3 +37,72 @@ func secondaryIpDiffSuppress(_, old, new string, _ *schema.ResourceData) bool {
   return false
 }
 
+// maintenanceVersionDiffSuppress suppresses diff when user has set an older version
+// and the instance is on a newer one. Version format is YYYYMMDD_XX_XX
+func maintenanceVersionDiffSuppress(_, old, new string, _ *schema.ResourceData) bool {
+	if old == "" || new == "" {
+		return false
+	}
+
+	// If they're equal, suppress the diff
+	if old == new {
+		return true
+	}
+
+	// Parse the version strings (format: YYYYMMDD_XX_XX)
+	// Extract the date portion (first 8 characters)
+	oldDate, err := parseMaintenanceVersion(old)
+	if err != nil {
+		return false
+	}
+
+	newDate, err := parseMaintenanceVersion(new)
+	if err != nil {
+		return false
+	}
+
+	// Suppress diff if new (config) version is older than old (API) version
+	// This means the instance has been upgraded to a newer version
+	return newDate.Before(oldDate)
+}
+
+// parseMaintenanceVersion parses a maintenance version string
+// Format: YYYYMMDD_XX_XX where YYYYMMDD is the date
+func parseMaintenanceVersion(version string) (time.Time, error) {
+	// Version format is YYYYMMDD_XX_XX (e.g., 20250326_00_00)
+	parts := strings.Split(version, "_")
+	if len(parts) < 1 {
+		return time.Time{}, fmt.Errorf("invalid version format: %s", version)
+	}
+
+	dateStr := parts[0]
+	if len(dateStr) != 8 {
+		return time.Time{}, fmt.Errorf("invalid date format: %s", dateStr)
+	}
+
+	// Parse YYYYMMDD format
+	date, err := time.Parse("20060102", dateStr)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse date %s: %v", dateStr, err)
+	}
+
+	// If there are additional parts (XX_XX), use them for sub-version ordering within same date
+	if len(parts) == 3 {
+		// Parse the minor and patch versions
+		minor, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return time.Time{}, fmt.Errorf("failed to parse minor version: %v", err)
+		}
+		patch, err := strconv.Atoi(parts[2])
+		if err != nil {
+			return time.Time{}, fmt.Errorf("failed to parse patch version: %v", err)
+		}
+		
+		// Add minor version as hours and patch version as minutes to make comparison work
+		// This ensures 20250326_00_01 > 20250326_00_00
+		date = date.Add(time.Duration(minor) * time.Hour)
+		date = date.Add(time.Duration(patch) * time.Minute)
+	}
+
+	return date, nil
+}

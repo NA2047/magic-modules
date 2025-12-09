@@ -91,3 +91,82 @@ func TestUnitRedisInstance_redisVersionIsDecreasing(t *testing.T) {
 		}
 	}
 }
+
+func TestMaintenanceVersionDiffSuppress(t *testing.T) {
+	cases := map[string]struct {
+		Old, New           string
+		ExpectDiffSuppress bool
+	}{
+		"same versions": {
+			Old:                "20250326_00_00",
+			New:                "20250326_00_00",
+			ExpectDiffSuppress: true,
+		},
+		"config is older than API (should suppress - instance was upgraded)": {
+			Old:                "20250701_00_01",
+			New:                "20250326_00_00",
+			ExpectDiffSuppress: true,
+		},
+		"config is newer than API (should NOT suppress - user wants upgrade)": {
+			Old:                "20250326_00_00",
+			New:                "20250701_00_01",
+			ExpectDiffSuppress: false,
+		},
+		"same date different patch version - config older": {
+			Old:                "20250326_00_01",
+			New:                "20250326_00_00",
+			ExpectDiffSuppress: true,
+		},
+		"same date different patch version - config newer": {
+			Old:                "20250326_00_00",
+			New:                "20250326_00_01",
+			ExpectDiffSuppress: false,
+		},
+		"different dates - config much older": {
+			Old:                "20251007_00_00",
+			New:                "20250326_00_00",
+			ExpectDiffSuppress: true,
+		},
+		"different dates - config much newer": {
+			Old:                "20250326_00_00",
+			New:                "20251007_00_00",
+			ExpectDiffSuppress: false,
+		},
+		"empty old value": {
+			Old:                "",
+			New:                "20250326_00_00",
+			ExpectDiffSuppress: false,
+		},
+		"empty new value": {
+			Old:                "20250326_00_00",
+			New:                "",
+			ExpectDiffSuppress: false,
+		},
+		"both empty": {
+			Old:                "",
+			New:                "",
+			ExpectDiffSuppress: false,
+		},
+		"invalid format - should not suppress": {
+			Old:                "invalid",
+			New:                "20250326_00_00",
+			ExpectDiffSuppress: false,
+		},
+		"minor version difference - config older": {
+			Old:                "20250806_01_00",
+			New:                "20250806_00_00",
+			ExpectDiffSuppress: true,
+		},
+		"minor version difference - config newer": {
+			Old:                "20250806_00_00",
+			New:                "20250806_01_00",
+			ExpectDiffSuppress: false,
+		},
+	}
+
+	for tn, tc := range cases {
+		if maintenanceVersionDiffSuppress(tc.Old, tc.New) != tc.ExpectDiffSuppress {
+			t.Fatalf("bad: %s, '%s' => '%s' expect %t", tn, tc.Old, tc.New, tc.ExpectDiffSuppress)
+		}
+	}
+}

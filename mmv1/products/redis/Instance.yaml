@@ -421,6 +421,7 @@ properties:
     description: The self service update maintenance version.
     required: false
     default_from_api: true
+    diff_suppress_func: 'maintenanceVersionDiffSuppress'
   - name: 'memorySizeGb'
     type: Integer
     description: Redis memory size in GiB.
