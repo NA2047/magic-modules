@@ -162,6 +162,11 @@ func TestMaintenanceVersionDiffSuppress(t *testing.T) {
 			New:                "20250806_01_00",
 			ExpectDiffSuppress: false,
 		},
+		"minor and patch version greater than 60": {
+			Old:                "20250806_00_00",
+			New:                "20250806_70_90",
+			ExpectDiffSuppress: false,
+		},
 	}
 
 	for tn, tc := range cases {
