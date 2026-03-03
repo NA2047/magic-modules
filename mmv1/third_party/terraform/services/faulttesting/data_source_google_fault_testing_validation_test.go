@@ -30,6 +30,8 @@ func TestAccFaultTestingValidationDatasource(t *testing.T) {
 
 func testAccFaultTestingValidationDatasourceConfig(context map[string]interface{}) string {
 	return acctest.Nprintf(`
+data "google_project" "project" {}
+
 resource "google_fault_testing_validation" "default" {
   validation_id = "tf-test-validation-%{random_suffix}"
   location      = "us-central1"

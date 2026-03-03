@@ -20,17 +20,10 @@ self_link: projects/{{project}}/locations/{{location}}/validations/{{validation_
 create_url: projects/{{project}}/locations/{{location}}/validations?validationId={{validation_id}}
 import_format:
   - projects/{{project}}/locations/{{location}}/validations/{{validation_id}}
-autogen_async: true
-async:
-  operation:
-    timeouts:
-      insert_minutes: 20
-      update_minutes: 20
-      delete_minutes: 20
-    base_url: '{{op_id}}'
-  result:
-    resource_inside_response: true
-autogen_status: VmFsaWRhdGlvbg==
+timeouts:
+  insert_minutes: 20
+  update_minutes: 20
+  delete_minutes: 20
 parameters:
   - name: location
     type: String
@@ -196,4 +189,4 @@ properties:
       becomes COMPLETED. The presence of this field can be used to
       determine if the Validation is done or not.
     output: true
-min_version: internal
+min_version: beta

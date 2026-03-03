@@ -15,23 +15,19 @@
 name: ExperimentTemplate
 description: Description
 base_url: projects/{{project}}/locations/{{location}}/experimentTemplates
+identity:
+  - location
+  - experimentTemplateId
 update_mask: true
 self_link: projects/{{project}}/locations/{{location}}/experimentTemplates/{{experiment_template_id}}
 create_url: projects/{{project}}/locations/{{location}}/experimentTemplates?experimentTemplateId={{experiment_template_id}}
 update_verb: PATCH
 import_format:
   - projects/{{project}}/locations/{{location}}/experimentTemplates/{{experiment_template_id}}
-autogen_async: true
-async:
-  operation:
-    timeouts:
-      insert_minutes: 20
-      update_minutes: 20
-      delete_minutes: 20
-    base_url: '{{op_id}}'
-  result:
-    resource_inside_response: true
-autogen_status: RXhwZXJpbWVudFRlbXBsYXRl
+timeouts:
+  insert_minutes: 20
+  update_minutes: 20
+  delete_minutes: 20
 parameters:
   - name: location
     type: String
@@ -45,7 +41,6 @@ parameters:
     description: |-
       The ID to use for the experiment_template, which will become the final
       component of the experiment_template's resource name. Required.
-
       This value should be 4-63 characters, and valid characters
       are /a-z-/. Must start with a letter and cannot end with a hyphen.
     immutable: true
@@ -190,4 +185,4 @@ properties:
     type: String
     description: The time the template was last updated.
     output: true
-min_version: internal
+min_version: beta

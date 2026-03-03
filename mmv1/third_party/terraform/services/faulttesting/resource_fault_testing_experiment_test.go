@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-provider-google/google/acctest"
 )
 
-func TestAccFaultTestingExperimentDatasource(t *testing.T) {
+func TestAccFaultTestingExperiment_basic(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -19,18 +19,19 @@ func TestAccFaultTestingExperimentDatasource(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFaultTestingExperimentDatasourceConfig(context),
-				Check: resource.ComposeTestCheckFunc(
-					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_testing_experiment.default", "google_fault_testing_experiment.default"),
-				),
+				Config: testAccFaultTestingExperiment_basic(context),
+			},
+			{
+				ResourceName:      "google_fault_testing_experiment.default",
+				ImportState:       true,
+				ImportStateVerify: true,
 			},
 		},
 	})
 }
 
-func testAccFaultTestingExperimentDatasourceConfig(context map[string]interface{}) string {
+func testAccFaultTestingExperiment_basic(context map[string]interface{}) string {
 	return acctest.Nprintf(`
-	
 data "google_project" "project" {}
 
 resource "google_fault_testing_experiment_template" "template" {
@@ -40,12 +41,8 @@ resource "google_fault_testing_experiment_template" "template" {
   duration               = "3600s"
 
   action {
-    l7_lb_http_fault {
-      forwarding_rule = "projects/${local.project}/regions/us-central1/forwardingRules/my-forwarding-rule"
-      abort {
-        percentage  = 50
-        status_code = 503
-      }
+    gce_fail_compute {
+      instance = "projects/${data.google_project.project.project_id}/zones/us-central1-a/instances/tf-test-my-instance-%{random_suffix}"
     }
   }
 }
@@ -55,11 +52,6 @@ resource "google_fault_testing_experiment" "default" {
   location      = "us-central1"
   description   = "basic experiment"
   experiment_template = google_fault_testing_experiment_template.template.name
-}
-
-data "google_fault_testing_experiment" "default" {
-  experiment_id = google_fault_testing_experiment.default.experiment_id
-  location      = "us-central1"
 }
 `, context)
 }

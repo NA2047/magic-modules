@@ -30,25 +30,23 @@ func TestAccFaultTestingExperimentTemplateDatasource(t *testing.T) {
 
 func testAccFaultTestingExperimentTemplateDatasourceConfig(context map[string]interface{}) string {
 	return acctest.Nprintf(`
-resource "google_fault_testing_experiment_template" "default" {
+data "google_project" "project" {}
+
+resource "google_fault_testing_experiment_template" "template" {
   experiment_template_id = "tf-test-exp-temp-%{random_suffix}"
   location               = "us-central1"
   description            = "basic experiment template"
   duration               = "3600s"
 
   action {
-    l7_lb_http_fault {
-      forwarding_rule = "projects/${local.project}/regions/us-central1/forwardingRules/my-forwarding-rule"
-      abort {
-        percentage  = 50
-        status_code = 503
-      }
+    gce_fail_compute {
+      instance = "projects/${data.google_project.project.project_id}/zones/us-central1-a/instances/tf-test-my-instance-%{random_suffix}"
     }
   }
 }
 
 data "google_fault_testing_experiment_template" "default" {
-  experiment_template_id = google_fault_testing_experiment_template.default.experiment_template_id
+  experiment_template_id = google_fault_testing_experiment_template.template.experiment_template_id
   location               = "us-central1"
 }
 `, context)

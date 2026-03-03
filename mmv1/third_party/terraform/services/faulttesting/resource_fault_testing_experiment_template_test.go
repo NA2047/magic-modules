@@ -1,0 +1,79 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+package faulttesting_test
+
+import (
+	"testing"
+
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-provider-google/google/acctest"
+)
+
+func TestAccFaultTestingExperimentTemplate_basic(t *testing.T) {
+	t.Parallel()
+
+	context := map[string]interface{}{
+		"random_suffix": acctest.RandString(t, 10),
+	}
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccFaultTestingExperimentTemplate_basic(context),
+			},
+			{
+				ResourceName:      "google_fault_testing_experiment_template.default",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccFaultTestingExperimentTemplate_update(context),
+			},
+			{
+				ResourceName:      "google_fault_testing_experiment_template.default",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func testAccFaultTestingExperimentTemplate_basic(context map[string]interface{}) string {
+	return acctest.Nprintf(`
+data "google_project" "project" {}
+
+resource "google_fault_testing_experiment_template" "default" {
+  experiment_template_id = "tf-test-exp-temp-%{random_suffix}"
+  location               = "us-central1"
+  description            = "basic experiment template"
+  duration               = "3600s"
+
+  action {
+    cloud_sql_failover {
+      instance = "projects/${data.google_project.project.project_id}/instances/tf-test-exp-instance-%{random_suffix}"
+    }
+  }
+}
+`, context)
+}
+
+func testAccFaultTestingExperimentTemplate_update(context map[string]interface{}) string {
+	return acctest.Nprintf(`
+data "google_project" "project" {}
+
+resource "google_fault_testing_experiment_template" "default" {
+  experiment_template_id = "tf-test-exp-temp-%{random_suffix}"
+  location               = "us-central1"
+  description            = "updated experiment template"
+  duration               = "7200s"
+
+  action {
+    cloud_sql_failover {
+      instance = "projects/${data.google_project.project.project_id}/instances/tf-test-exp-instance-%{random_suffix}"
+    }
+  }
+}
+`, context)
+}

@@ -20,5 +20,5 @@ versions:
   - name: 'ga'
     base_url: 'https://faulttesting.googleapis.com/v1alpha/'
   - name: 'beta'
-    base_url: 'https://faulttesting.googleapis.com/v1beta1/'
+    base_url: 'https://faulttesting.googleapis.com/v1alpha/'
 resourceswithcaiassettype: {}
