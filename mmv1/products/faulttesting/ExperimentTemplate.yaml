@@ -82,7 +82,7 @@ properties:
               Details specifying a Managed Instance Group (MIG) and optionally a zone
               within it.
             properties:
-              - name: instanceGroup
+              - name: instanceGroupManager
                 type: String
                 required: true
                 description: The managed instance group. Can be zonal or regional.
