@@ -242,4 +242,3 @@ properties:
       The intended duration of the Experiment. Min duration 1 minute, max 10
       days.
     output: true
-min_version: beta

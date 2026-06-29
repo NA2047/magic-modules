@@ -188,4 +188,3 @@ properties:
       becomes COMPLETED. The presence of this field can be used to
       determine if the Validation is done or not.
     output: true
-min_version: beta

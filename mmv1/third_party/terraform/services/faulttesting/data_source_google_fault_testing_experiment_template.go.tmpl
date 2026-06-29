@@ -8,7 +8,6 @@ import (
 	transport_tpg "github.com/hashicorp/terraform-provider-google/google/transport"
 )
 
-{{- if ne $.TargetVersionName "ga" }}
 
 func DataSourceGoogleFaultTestingExperimentTemplate() *schema.Resource {
 	// Generate datasource schema from resource
@@ -106,4 +105,3 @@ func DataSourceGoogleFaultTestingExperimentTemplateRead(d *schema.ResourceData, 
 	}
 	return nil
 }
-{{- end }}

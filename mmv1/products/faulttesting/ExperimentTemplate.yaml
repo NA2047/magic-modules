@@ -14,7 +14,6 @@
 ---
 name: ExperimentTemplate
 description: Description
-min_version: beta
 base_url: projects/{{project}}/locations/{{location}}/experimentTemplates
 identity:
   - location

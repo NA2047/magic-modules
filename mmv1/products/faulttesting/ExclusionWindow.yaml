@@ -1,0 +1,64 @@
+# Copyright 2026 Google Inc.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+name: ExclusionWindow
+description: Description
+base_url: projects/{{project}}/locations/{{location}}/exclusionWindows
+self_link: projects/{{project}}/locations/{{location}}/exclusionWindows/{{exclusion_window_id}}
+create_url: projects/{{project}}/locations/{{location}}/exclusionWindows?exclusionWindowId={{exclusion_window_id}}
+update_mask: true
+update_verb: PATCH
+import_format:
+  - projects/{{project}}/locations/{{location}}/exclusionWindows/{{exclusion_window_id}}
+parameters:
+  - name: location
+    type: String
+    required: true
+    description: Resource ID segment making up resource `name`. It identifies the resource within its parent collection as described in https://google.aip.dev/122.
+    immutable: true
+    url_param_only: true
+  - name: exclusionWindowId
+    type: String
+    required: true
+    description: |-
+      The ID to use for the `exclusion_window`, which will become the final
+      component of the `exclusion_window`'s resource name. Required.
+
+      This value should be 4-63 characters, and valid characters
+      are /a-z-/. Must start with a letter and cannot end with a hyphen.
+    immutable: true
+    url_param_only: true
+properties:
+  - name: description
+    type: String
+    description: Optional user-provided description. Min length 0. Max length 2000.
+  - name: duration
+    type: String
+    required: true
+    description: How long the exclusion window lasts once started.
+  - name: endTime
+    type: String
+    description: When the exclusion window ends, or empty if it has not been started.
+    output: true
+  - name: name
+    type: String
+    description: |-
+      Identifier. The resource name of the exclusion window.
+      Format:
+      `projects/{project}/locations/{location}/exclusionWindows/{exclusion_window}`
+    output: true
+  - name: startTime
+    type: String
+    description: When the exclusion window started, or empty if it has not been started.
+    output: true

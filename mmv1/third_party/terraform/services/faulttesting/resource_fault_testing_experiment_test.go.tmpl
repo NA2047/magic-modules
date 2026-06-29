@@ -6,7 +6,6 @@ import (
 	"github.com/hashicorp/terraform-provider-google/google/acctest"
 )
 
-{{- if ne $.TargetVersionName "ga" }}
 
 func TestAccFaultTestingExperiment_basic(t *testing.T) {
 	t.Parallel()
@@ -56,4 +55,3 @@ resource "google_fault_testing_experiment" "default" {
 }
 `, context)
 }
-{{- end }}
