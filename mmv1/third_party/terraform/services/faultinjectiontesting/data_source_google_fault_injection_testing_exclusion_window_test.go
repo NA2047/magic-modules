@@ -1,4 +1,4 @@
-package faulttesting_test
+package faultinjectiontesting_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 
-func TestAccFaultTestingExclusionWindowDatasource(t *testing.T) {
+func TestAccFaultInjectionTestingExclusionWindowDatasource(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -19,26 +19,26 @@ func TestAccFaultTestingExclusionWindowDatasource(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFaultTestingExclusionWindowDatasourceConfig(context),
+				Config: testAccFaultInjectionTestingExclusionWindowDatasourceConfig(context),
 				Check: resource.ComposeTestCheckFunc(
-					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_testing_exclusion_window.default", "google_fault_testing_exclusion_window.default"),
+					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_injection_testing_exclusion_window.default", "google_fault_injection_testing_exclusion_window.default"),
 				),
 			},
 		},
 	})
 }
 
-func testAccFaultTestingExclusionWindowDatasourceConfig(context map[string]interface{}) string {
+func testAccFaultInjectionTestingExclusionWindowDatasourceConfig(context map[string]interface{}) string {
 	return acctest.Nprintf(`
-resource "google_fault_testing_exclusion_window" "default" {
+resource "google_fault_injection_testing_exclusion_window" "default" {
   exclusion_window_id = "tf-test-ex-win-%{random_suffix}"
   location            = "us-central1"
   description         = "basic exclusion window"
   duration            = "3600s"
 }
 
-data "google_fault_testing_exclusion_window" "default" {
-  exclusion_window_id = google_fault_testing_exclusion_window.default.exclusion_window_id
+data "google_fault_injection_testing_exclusion_window" "default" {
+  exclusion_window_id = google_fault_injection_testing_exclusion_window.default.exclusion_window_id
   location            = "us-central1"
 }
 `, context)

@@ -1,4 +1,4 @@
-package faulttesting_test
+package faultinjectiontesting_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 
-func TestAccFaultTestingValidationDatasource(t *testing.T) {
+func TestAccFaultInjectionTestingValidationDatasource(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -19,21 +19,21 @@ func TestAccFaultTestingValidationDatasource(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFaultTestingValidationDatasourceConfig(context),
+				Config: testAccFaultInjectionTestingValidationDatasourceConfig(context),
 				Check: resource.ComposeTestCheckFunc(
-					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_testing_validation.default", "google_fault_testing_validation.default"),
+					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_injection_testing_validation.default", "google_fault_injection_testing_validation.default"),
 				),
 			},
 		},
 	})
 }
 
-func testAccFaultTestingValidationDatasourceConfig(context map[string]interface{}) string {
+func testAccFaultInjectionTestingValidationDatasourceConfig(context map[string]interface{}) string {
 	return acctest.Nprintf(`
 data "google_project" "project" {}
 
-resource "google_fault_testing_validation" "default" {
-  validation_id = "tf-test-validation-%{random_suffix}"
+resource "google_fault_injection_testing_validation" "default" {
+  validation_id = "tf-test-val-%{random_suffix}"
   location      = "us-central1"
   description   = "basic validation"
 
@@ -48,8 +48,8 @@ resource "google_fault_testing_validation" "default" {
   }
 }
 
-data "google_fault_testing_validation" "default" {
-  validation_id = google_fault_testing_validation.default.validation_id
+data "google_fault_injection_testing_validation" "default" {
+  validation_id = google_fault_injection_testing_validation.default.validation_id
   location      = "us-central1"
 }
 `, context)

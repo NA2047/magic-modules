@@ -1,4 +1,4 @@
-package faulttesting_test
+package faultinjectiontesting_test
 
 import (
 	"testing"
@@ -6,8 +6,7 @@ import (
 	"github.com/hashicorp/terraform-provider-google/google/acctest"
 )
 
-
-func TestAccFaultTestingExperimentDatasource(t *testing.T) {
+func TestAccFaultInjectionTestingExperimentDatasource(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -19,21 +18,20 @@ func TestAccFaultTestingExperimentDatasource(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFaultTestingExperimentDatasourceConfig(context),
+				Config: testAccFaultInjectionTestingExperimentDatasourceConfig(context),
 				Check: resource.ComposeTestCheckFunc(
-					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_testing_experiment.default", "google_fault_testing_experiment.default"),
+					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_injection_testing_experiment.default", "google_fault_injection_testing_experiment.default"),
 				),
 			},
 		},
 	})
 }
 
-func testAccFaultTestingExperimentDatasourceConfig(context map[string]interface{}) string {
+func testAccFaultInjectionTestingExperimentDatasourceConfig(context map[string]interface{}) string {
 	return acctest.Nprintf(`
-	
 data "google_project" "project" {}
 
-resource "google_fault_testing_experiment_template" "template" {
+resource "google_fault_injection_testing_experiment_template" "template" {
   experiment_template_id = "tf-test-exp-temp-%{random_suffix}"
   location               = "us-central1"
   description            = "basic experiment template"
@@ -50,15 +48,15 @@ resource "google_fault_testing_experiment_template" "template" {
   }
 }
 
-resource "google_fault_testing_experiment" "default" {
+resource "google_fault_injection_testing_experiment" "default" {
   experiment_id = "tf-test-exp-%{random_suffix}"
   location      = "us-central1"
   description   = "basic experiment"
-  experiment_template = google_fault_testing_experiment_template.template.name
+  experiment_template = google_fault_injection_testing_experiment_template.template.name
 }
 
-data "google_fault_testing_experiment" "default" {
-  experiment_id = google_fault_testing_experiment.default.experiment_id
+data "google_fault_injection_testing_experiment" "default" {
+  experiment_id = google_fault_injection_testing_experiment.default.experiment_id
   location      = "us-central1"
 }
 `, context)

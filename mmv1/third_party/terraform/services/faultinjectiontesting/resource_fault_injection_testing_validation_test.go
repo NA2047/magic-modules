@@ -1,4 +1,4 @@
-package faulttesting_test
+package faultinjectiontesting_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 
-func TestAccFaultTestingValidation_basic(t *testing.T) {
+func TestAccFaultInjectionTestingValidation_basic(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -19,10 +19,10 @@ func TestAccFaultTestingValidation_basic(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFaultTestingValidation_basic(context),
+				Config: testAccFaultInjectionTestingValidation_basic(context),
 			},
 			{
-				ResourceName:      "google_fault_testing_validation.default",
+				ResourceName:      "google_fault_injection_testing_validation.default",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
@@ -30,11 +30,11 @@ func TestAccFaultTestingValidation_basic(t *testing.T) {
 	})
 }
 
-func testAccFaultTestingValidation_basic(context map[string]interface{}) string {
+func testAccFaultInjectionTestingValidation_basic(context map[string]interface{}) string {
 	return acctest.Nprintf(`
 data "google_project" "project" {}
 
-resource "google_fault_testing_validation" "default" {
+resource "google_fault_injection_testing_validation" "default" {
   validation_id = "tf-test-val-%{random_suffix}"
   location      = "us-central1"
   description   = "basic validation"

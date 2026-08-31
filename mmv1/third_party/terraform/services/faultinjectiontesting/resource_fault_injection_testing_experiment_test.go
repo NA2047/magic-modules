@@ -1,4 +1,4 @@
-package faulttesting_test
+package faultinjectiontesting_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 
-func TestAccFaultTestingExperiment_basic(t *testing.T) {
+func TestAccFaultInjectionTestingExperiment_basic(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -19,10 +19,10 @@ func TestAccFaultTestingExperiment_basic(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFaultTestingExperiment_basic(context),
+				Config: testAccFaultInjectionTestingExperiment_basic(context),
 			},
 			{
-				ResourceName:      "google_fault_testing_experiment.default",
+				ResourceName:      "google_fault_injection_testing_experiment.default",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
@@ -30,11 +30,11 @@ func TestAccFaultTestingExperiment_basic(t *testing.T) {
 	})
 }
 
-func testAccFaultTestingExperiment_basic(context map[string]interface{}) string {
+func testAccFaultInjectionTestingExperiment_basic(context map[string]interface{}) string {
 	return acctest.Nprintf(`
 data "google_project" "project" {}
 
-resource "google_fault_testing_experiment_template" "template" {
+resource "google_fault_injection_testing_experiment_template" "template" {
   experiment_template_id = "tf-test-exp-temp-%{random_suffix}"
   location               = "us-central1"
   description            = "basic experiment template"
@@ -47,11 +47,11 @@ resource "google_fault_testing_experiment_template" "template" {
   }
 }
 
-resource "google_fault_testing_experiment" "default" {
+resource "google_fault_injection_testing_experiment" "default" {
   experiment_id = "tf-test-exp-%{random_suffix}"
   location      = "us-central1"
   description   = "basic experiment"
-  experiment_template = google_fault_testing_experiment_template.template.name
+  experiment_template = google_fault_injection_testing_experiment_template.template.name
 }
 `, context)
 }

@@ -1,4 +1,4 @@
-package faulttesting_test
+package faultinjectiontesting_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 
-func TestAccFaultTestingExperimentTemplate_basic(t *testing.T) {
+func TestAccFaultInjectionTestingExperimentTemplate_basic(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -19,18 +19,18 @@ func TestAccFaultTestingExperimentTemplate_basic(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFaultTestingExperimentTemplate_basic(context),
+				Config: testAccFaultInjectionTestingExperimentTemplate_basic(context),
 			},
 			{
-				ResourceName:      "google_fault_testing_experiment_template.default",
+				ResourceName:      "google_fault_injection_testing_experiment_template.default",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
 			{
-				Config: testAccFaultTestingExperimentTemplate_update(context),
+				Config: testAccFaultInjectionTestingExperimentTemplate_update(context),
 			},
 			{
-				ResourceName:      "google_fault_testing_experiment_template.default",
+				ResourceName:      "google_fault_injection_testing_experiment_template.default",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
@@ -38,11 +38,11 @@ func TestAccFaultTestingExperimentTemplate_basic(t *testing.T) {
 	})
 }
 
-func testAccFaultTestingExperimentTemplate_basic(context map[string]interface{}) string {
+func testAccFaultInjectionTestingExperimentTemplate_basic(context map[string]interface{}) string {
 	return acctest.Nprintf(`
 data "google_project" "project" {}
 
-resource "google_fault_testing_experiment_template" "default" {
+resource "google_fault_injection_testing_experiment_template" "default" {
   experiment_template_id = "tf-test-exp-temp-%{random_suffix}"
   location               = "us-central1"
   description            = "basic experiment template"
@@ -57,11 +57,11 @@ resource "google_fault_testing_experiment_template" "default" {
 `, context)
 }
 
-func testAccFaultTestingExperimentTemplate_update(context map[string]interface{}) string {
+func testAccFaultInjectionTestingExperimentTemplate_update(context map[string]interface{}) string {
 	return acctest.Nprintf(`
 data "google_project" "project" {}
 
-resource "google_fault_testing_experiment_template" "default" {
+resource "google_fault_injection_testing_experiment_template" "default" {
   experiment_template_id = "tf-test-exp-temp-%{random_suffix}"
   location               = "us-central1"
   description            = "updated experiment template"

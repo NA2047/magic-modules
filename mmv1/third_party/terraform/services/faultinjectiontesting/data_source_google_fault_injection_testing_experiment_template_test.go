@@ -1,4 +1,4 @@
-package faulttesting_test
+package faultinjectiontesting_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 
-func TestAccFaultTestingExperimentTemplateDatasource(t *testing.T) {
+func TestAccFaultInjectionTestingExperimentTemplateDatasource(t *testing.T) {
 	t.Parallel()
 
 	context := map[string]interface{}{
@@ -19,20 +19,20 @@ func TestAccFaultTestingExperimentTemplateDatasource(t *testing.T) {
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFaultTestingExperimentTemplateDatasourceConfig(context),
+				Config: testAccFaultInjectionTestingExperimentTemplateDatasourceConfig(context),
 				Check: resource.ComposeTestCheckFunc(
-					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_testing_experiment_template.default", "google_fault_testing_experiment_template.default"),
+					acctest.CheckDataSourceStateMatchesResourceState("data.google_fault_injection_testing_experiment_template.default", "google_fault_injection_testing_experiment_template.default"),
 				),
 			},
 		},
 	})
 }
 
-func testAccFaultTestingExperimentTemplateDatasourceConfig(context map[string]interface{}) string {
+func testAccFaultInjectionTestingExperimentTemplateDatasourceConfig(context map[string]interface{}) string {
 	return acctest.Nprintf(`
 data "google_project" "project" {}
 
-resource "google_fault_testing_experiment_template" "template" {
+resource "google_fault_injection_testing_experiment_template" "template" {
   experiment_template_id = "tf-test-exp-temp-%{random_suffix}"
   location               = "us-central1"
   description            = "basic experiment template"
@@ -45,8 +45,8 @@ resource "google_fault_testing_experiment_template" "template" {
   }
 }
 
-data "google_fault_testing_experiment_template" "default" {
-  experiment_template_id = google_fault_testing_experiment_template.template.experiment_template_id
+data "google_fault_injection_testing_experiment_template" "default" {
+  experiment_template_id = google_fault_injection_testing_experiment_template.template.experiment_template_id
   location               = "us-central1"
 }
 `, context)
