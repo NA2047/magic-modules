@@ -23,6 +23,8 @@ func TestAccRedisClusterAuthTokenDatasource(t *testing.T) {
 				Config: testAccRedisClusterAuthTokenDatasource(context),
 				Check: resource.ComposeTestCheckFunc(
 					acctest.CheckDataSourceStateMatchesResourceState("data.google_redis_cluster_auth_token.with_token_id", "google_redis_cluster_auth_token.token-basic"),
+					acctest.CheckDataSourceStateMatchesResourceState("data.google_redis_cluster_auth_token.omitted_scope", "google_redis_cluster_auth_token.token-basic"),
+					acctest.CheckDataSourceStateMatchesResourceState("data.google_redis_cluster_auth_token.default", "google_redis_cluster_auth_token.token-basic"),
 					resource.TestCheckResourceAttrSet("data.google_redis_cluster_auth_token.default", "name"),
 					resource.TestCheckResourceAttrSet("data.google_redis_cluster_auth_token.default", "token_id"),
 				),
@@ -52,6 +54,11 @@ resource "google_redis_cluster_auth_token" "token-basic" {
 
 data "google_redis_cluster_auth_token" "with_token_id" {
   token_auth_user             = google_redis_cluster_token_auth_user.user-basic.id
+  token_id                    = google_redis_cluster_auth_token.token-basic.token_id
+}
+
+data "google_redis_cluster_auth_token" "omitted_scope" {
+  token_auth_user             = "${google_redis_cluster.cluster.name}/tokenAuthUsers/${google_redis_cluster_token_auth_user.user-basic.user_id}"
   token_id                    = google_redis_cluster_auth_token.token-basic.token_id
 }
 

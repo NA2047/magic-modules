@@ -23,8 +23,10 @@ func TestAccRedisClusterTokenAuthUserDatasource(t *testing.T) {
 				Config: testAccRedisClusterTokenAuthUserDatasource(context),
 				Check: resource.ComposeTestCheckFunc(
 					acctest.CheckDataSourceStateMatchesResourceState("data.google_redis_cluster_token_auth_user.custom", "google_redis_cluster_token_auth_user.user-basic"),
+					acctest.CheckDataSourceStateMatchesResourceState("data.google_redis_cluster_token_auth_user.by_name_omitted_scope", "google_redis_cluster_token_auth_user.user-basic"),
 					resource.TestCheckResourceAttrSet("data.google_redis_cluster_token_auth_user.default", "name"),
 					resource.TestCheckResourceAttr("data.google_redis_cluster_token_auth_user.default", "user_id", "default"),
+					resource.TestCheckResourceAttrSet("data.google_redis_cluster_token_auth_user.default", "state"),
 				),
 			},
 		},
@@ -51,8 +53,14 @@ data "google_redis_cluster_token_auth_user" "custom" {
   user_id                     = google_redis_cluster_token_auth_user.user-basic.user_id
 }
 
+data "google_redis_cluster_token_auth_user" "by_name_omitted_scope" {
+  cluster                     = google_redis_cluster.cluster.name
+  user_id                     = google_redis_cluster_token_auth_user.user-basic.user_id
+}
+
 data "google_redis_cluster_token_auth_user" "default" {
-  cluster                     = google_redis_cluster.cluster.id
+  cluster                     = google_redis_cluster.cluster.name
+  region                      = "europe-west4"
   user_id                     = "default"
 }
 `, context)

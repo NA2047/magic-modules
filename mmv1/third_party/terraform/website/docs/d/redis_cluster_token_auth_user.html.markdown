@@ -23,11 +23,19 @@ The following arguments are supported:
 
 * `cluster` -
   (Required)
-  The full name or ID of the Redis Cluster.
+  The full resource ID of the Redis Cluster (`projects/{project}/locations/{region}/clusters/{cluster}`) or the short cluster name.
 
 * `user_id` -
   (Required)
   The unique ID of the token auth user. Can also be set to `"default"` to inspect the cluster's built-in default user.
+
+* `project` -
+  (Optional)
+  The ID of the project in which the resource belongs. If it is not provided, the provider project is used.
+
+* `region` -
+  (Optional)
+  The name of the region of the Redis cluster. If not provided, the provider region is used.
 
 ## Attributes Reference
 
