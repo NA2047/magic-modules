@@ -2,7 +2,6 @@ package redis
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-google/google/registry"
@@ -13,14 +12,16 @@ import (
 func DataSourceRedisClusterAuthToken() *schema.Resource {
 	// Generate datasource schema from resource
 	dsSchema := tpgresource.DatasourceSchemaFromResourceSchema(ResourceRedisClusterAuthToken().Schema)
+	dsSchema["token"].Sensitive = true
 
 	// Set 'Required' and 'Optional' schema elements
 	tpgresource.AddRequiredFieldsToSchema(dsSchema, "cluster", "user_id", "token_id")
 	tpgresource.AddOptionalFieldsToSchema(dsSchema, "project", "region")
 
 	return &schema.Resource{
-		Read:   dataSourceRedisClusterAuthTokenRead,
-		Schema: dsSchema,
+		Read:          dataSourceRedisClusterAuthTokenRead,
+		Schema:        dsSchema,
+		UseJSONNumber: true,
 	}
 }
 
@@ -28,38 +29,97 @@ func dataSourceRedisClusterAuthTokenRead(d *schema.ResourceData, meta interface{
 	config := meta.(*transport_tpg.Config)
 
 	cluster := d.Get("cluster").(string)
-	clusterRegex := regexp.MustCompile("projects/([^/]+)/locations/([^/]+)/clusters/([^/]+)")
-	if clusterRegex.MatchString(cluster) {
-		parts := clusterRegex.FindStringSubmatch(cluster)
+	if parts := redisClusterFullIdRegex.FindStringSubmatch(cluster); parts != nil {
 		if d.Get("project") == "" {
-			d.Set("project", parts[1])
+			if err := d.Set("project", parts[1]); err != nil {
+				return fmt.Errorf("Error setting project: %s", err)
+			}
 		}
 		if d.Get("region") == "" {
-			d.Set("region", parts[2])
+			if err := d.Set("region", parts[2]); err != nil {
+				return fmt.Errorf("Error setting region: %s", err)
+			}
 		}
-		d.Set("cluster", parts[3])
+		if err := d.Set("cluster", parts[3]); err != nil {
+			return fmt.Errorf("Error setting cluster: %s", err)
+		}
+	} else {
+		if err := d.Set("cluster", tpgresource.GetResourceNameFromSelfLink(cluster)); err != nil {
+			return fmt.Errorf("Error setting cluster: %s", err)
+		}
+	}
+
+	userId := d.Get("user_id").(string)
+	if parts := redisClusterUserFullIdRegex.FindStringSubmatch(userId); parts != nil {
+		if d.Get("project") == "" {
+			if err := d.Set("project", parts[1]); err != nil {
+				return fmt.Errorf("Error setting project: %s", err)
+			}
+		}
+		if d.Get("region") == "" {
+			if err := d.Set("region", parts[2]); err != nil {
+				return fmt.Errorf("Error setting region: %s", err)
+			}
+		}
+		if d.Get("cluster") == "" {
+			if err := d.Set("cluster", parts[3]); err != nil {
+				return fmt.Errorf("Error setting cluster: %s", err)
+			}
+		}
+		if err := d.Set("user_id", parts[4]); err != nil {
+			return fmt.Errorf("Error setting user_id: %s", err)
+		}
+	} else {
+		if err := d.Set("user_id", tpgresource.GetResourceNameFromSelfLink(userId)); err != nil {
+			return fmt.Errorf("Error setting user_id: %s", err)
+		}
+	}
+
+	tokenId := d.Get("token_id").(string)
+	if parts := redisClusterTokenFullIdRegex.FindStringSubmatch(tokenId); parts != nil {
+		if d.Get("project") == "" {
+			if err := d.Set("project", parts[1]); err != nil {
+				return fmt.Errorf("Error setting project: %s", err)
+			}
+		}
+		if d.Get("region") == "" {
+			if err := d.Set("region", parts[2]); err != nil {
+				return fmt.Errorf("Error setting region: %s", err)
+			}
+		}
+		if d.Get("cluster") == "" {
+			if err := d.Set("cluster", parts[3]); err != nil {
+				return fmt.Errorf("Error setting cluster: %s", err)
+			}
+		}
+		if d.Get("user_id") == "" {
+			if err := d.Set("user_id", parts[4]); err != nil {
+				return fmt.Errorf("Error setting user_id: %s", err)
+			}
+		}
+		if err := d.Set("token_id", parts[5]); err != nil {
+			return fmt.Errorf("Error setting token_id: %s", err)
+		}
+	} else {
+		if err := d.Set("token_id", tpgresource.GetResourceNameFromSelfLink(tokenId)); err != nil {
+			return fmt.Errorf("Error setting token_id: %s", err)
+		}
 	}
 
 	project, err := tpgresource.GetProject(d, config)
 	if err != nil {
 		return err
 	}
-	d.Set("project", project)
+	if err := d.Set("project", project); err != nil {
+		return fmt.Errorf("Error setting project: %s", err)
+	}
 
 	region, err := tpgresource.GetRegion(d, config)
 	if err != nil {
 		return err
 	}
-	d.Set("region", region)
-
-	tokenId := tpgresource.GetResourceNameFromSelfLink(d.Get("token_id").(string))
-	if err := d.Set("token_id", tokenId); err != nil {
-		return fmt.Errorf("Error setting token_id: %s", err)
-	}
-
-	userId := tpgresource.GetResourceNameFromSelfLink(d.Get("user_id").(string))
-	if err := d.Set("user_id", userId); err != nil {
-		return fmt.Errorf("Error setting user_id: %s", err)
+	if err := d.Set("region", region); err != nil {
+		return fmt.Errorf("Error setting region: %s", err)
 	}
 
 	id, err := tpgresource.ReplaceVars(d, config, "projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens/{{token_id}}")
@@ -68,12 +128,14 @@ func dataSourceRedisClusterAuthTokenRead(d *schema.ResourceData, meta interface{
 	}
 	d.SetId(id)
 
-	err = resourceRedisClusterAuthTokenRead(d, meta)
-	if err != nil {
+	if err := resourceRedisClusterAuthTokenRead(d, meta); err != nil {
 		return err
 	}
 	if d.Id() == "" {
 		return fmt.Errorf("%s not found", id)
+	}
+	if err := d.Set("deletion_policy", nil); err != nil {
+		return fmt.Errorf("Error setting deletion_policy: %s", err)
 	}
 	return nil
 }

@@ -1,5 +1,5 @@
 ---
-subcategory: "Redis"
+subcategory: "Memorystore (Redis)"
 description: |-
   Get information about an Auth Token for a Google Cloud Redis Cluster Token Auth User.
 ---

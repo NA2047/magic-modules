@@ -1,3 +1,4 @@
+---
 # Copyright 2026 Google Inc.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -10,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 name: ClusterAuthToken
 description: |
   Represents an Auth Token for a Token Auth User within a Google Cloud Redis Cluster.
@@ -25,26 +25,25 @@ references:
 docs:
   note: |
     Deleting the sole remaining token for a user is rejected by the API. Set `deletion_policy = "ABANDON"` to remove a user's last remaining token from Terraform state without calling the delete API (for example, before destroying the parent user or cluster).
-supports_indirect_user_project_override: true
+base_url: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens
 immutable: true
+self_link: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens/{{token_id}}
+create_url: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}:addAuthToken
+import_format:
+  - projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens/{{token_id}}
+custom_diff:
+  - redisClusterAuthTokenProjectRegionDiff
 # A per-user mutex lock is required because :addAuthToken and DELETE transition the parent
 # TokenAuthUser into UPDATING state on the backend, which rejects concurrent token operations
 # for the same user with FAILED_PRECONDITION: token auth user is not in active state.
 mutex: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}
-base_url: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens
-self_link: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens/{{token_id}}
-create_url: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}:addAuthToken
-delete_url: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens/{{token_id}}
-id_format: projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens/{{token_id}}
-import_format:
-  - projects/{{project}}/locations/{{region}}/clusters/{{cluster}}/tokenAuthUsers/{{user_id}}/authTokens/{{token_id}}
-async:
-  type: OpAsync
-  operation:
-    base_url: '{{op_id}}'
+exclude_default_cdiff: true
+supports_indirect_user_project_override: true
+autogen_async: true
+exclude_tgc: true
 custom_code:
-  constants: templates/terraform/constants/redis_auth_token.go.tmpl
   encoder: templates/terraform/encoders/redis_auth_token.go.tmpl
+  constants: templates/terraform/constants/redis_auth_token.go.tmpl
   pre_create: templates/terraform/pre_create/redis_auth_token.go.tmpl
   post_create: templates/terraform/post_create/redis_auth_token.go.tmpl
 samples:
@@ -59,7 +58,6 @@ parameters:
   - name: region
     type: String
     description: The name of the region of the Redis cluster.
-    immutable: true
     url_param_only: true
     ignore_read: true
     default_from_api: true
@@ -69,16 +67,14 @@ parameters:
     imports: name
     description: The name or resource ID of the Redis cluster.
     required: true
-    immutable: true
     url_param_only: true
-    diff_suppress_func: tpgresource.CompareResourceNames
+    diff_suppress_func: redisClusterAuthTokenClusterDiffSuppress
   - name: userId
     type: String
     description: The unique ID (username) of the Token Auth User.
     required: true
-    immutable: true
     url_param_only: true
-    diff_suppress_func: tpgresource.CompareResourceNames
+    diff_suppress_func: redisClusterAuthTokenUserDiffSuppress
 properties:
   # tokenId cannot be required: true or url_param_only: true because the Redis Cluster API's
   # :addAuthToken endpoint generates sequential version-N IDs server-side and does not accept
@@ -93,8 +89,7 @@ properties:
       If specified, Terraform acquires and manages the existing active token with this ID (such as the initial `version-1` token automatically created with the cluster or user) and returns an error if it does not exist.
       If omitted, a new token version will be created on the server.
     default_from_api: true
-    immutable: true
-    diff_suppress_func: tpgresource.CompareResourceNames
+    diff_suppress_func: redisClusterAuthTokenTokenDiffSuppress
     custom_flatten: templates/terraform/custom_flatten/name_from_self_link.tmpl
   - name: name
     type: String

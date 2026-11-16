@@ -1,16 +1,35 @@
-// If the user passed a full cluster resource ID (projects/{p}/locations/{r}/clusters/{c})
-// instead of a short cluster name, extract project, region, and the short cluster name
+{{/*
+	Copyright 2026 Google Inc.
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/ -}}
+// If the user passed a full cluster or user resource ID instead of a short name,
+// extract any unset project/region and normalize cluster and user_id to short names
 // before mutex and URL templates are evaluated.
-cluster := d.Get("cluster").(string)
-if parts := regexp.MustCompile("projects/([^/]+)/locations/([^/]+)/clusters/([^/]+)").FindStringSubmatch(cluster); parts != nil {
+isConfigured := func(key string) bool {
 	rawCfg := d.GetRawConfig()
-	useDefaults := rawCfg.IsNull() || !rawCfg.Type().IsObjectType()
-	if (useDefaults && d.Get("project") == "") || (!useDefaults && rawCfg.Type().HasAttribute("project") && rawCfg.GetAttr("project").IsNull()) {
+	if !rawCfg.IsNull() && rawCfg.Type().IsObjectType() && rawCfg.Type().HasAttribute(key) {
+		attr := rawCfg.GetAttr(key)
+		return !attr.IsNull() && !(attr.IsKnown() && attr.Type() == cty.String && attr.AsString() == "")
+	}
+	v, ok := d.GetOk(key)
+	return ok && v.(string) != ""
+}
+
+cluster := d.Get("cluster").(string)
+if parts := redisClusterFullIdRegex.FindStringSubmatch(cluster); parts != nil {
+	if !isConfigured("project") {
 		if err := d.Set("project", parts[1]); err != nil {
 			return nil, fmt.Errorf("Error setting project: %s", err)
 		}
 	}
-	if (useDefaults && d.Get("region") == "") || (!useDefaults && rawCfg.Type().HasAttribute("region") && rawCfg.GetAttr("region").IsNull()) {
+	if !isConfigured("region") {
 		if err := d.Set("region", parts[2]); err != nil {
 			return nil, fmt.Errorf("Error setting region: %s", err)
 		}
@@ -18,10 +37,31 @@ if parts := regexp.MustCompile("projects/([^/]+)/locations/([^/]+)/clusters/([^/
 	if err := d.Set("cluster", parts[3]); err != nil {
 		return nil, fmt.Errorf("Error setting cluster: %s", err)
 	}
+} else if cluster != "" {
+	if err := d.Set("cluster", tpgresource.GetResourceNameFromSelfLink(cluster)); err != nil {
+		return nil, fmt.Errorf("Error setting cluster: %s", err)
+	}
 }
+
 if userId := d.Get("user_id").(string); userId != "" {
-	if err := d.Set("user_id", tpgresource.GetResourceNameFromSelfLink(userId)); err != nil {
-		return nil, fmt.Errorf("Error setting user_id: %s", err)
+	if parts := redisClusterUserFullIdRegex.FindStringSubmatch(userId); parts != nil {
+		if !isConfigured("project") {
+			if err := d.Set("project", parts[1]); err != nil {
+				return nil, fmt.Errorf("Error setting project: %s", err)
+			}
+		}
+		if !isConfigured("region") {
+			if err := d.Set("region", parts[2]); err != nil {
+				return nil, fmt.Errorf("Error setting region: %s", err)
+			}
+		}
+		if err := d.Set("user_id", parts[4]); err != nil {
+			return nil, fmt.Errorf("Error setting user_id: %s", err)
+		}
+	} else {
+		if err := d.Set("user_id", tpgresource.GetResourceNameFromSelfLink(userId)); err != nil {
+			return nil, fmt.Errorf("Error setting user_id: %s", err)
+		}
 	}
 }
 

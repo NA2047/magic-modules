@@ -1,8 +1,300 @@
+{{/*
+	Copyright 2026 Google Inc.
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/ -}}
 {{- if not (contains $.ProductMetadata.Compiler "terraformgoogleconversion") }}
-// LatestRedisClusterAuthToken selects the AuthToken entry with the highest sequential
+var (
+	redisClusterFullIdRegex      = regexp.MustCompile(`^projects/([^/\s]+)/locations/([^/\s]+)/clusters/([^/\s]+)$`)
+	redisClusterUserFullIdRegex  = regexp.MustCompile(`^projects/([^/\s]+)/locations/([^/\s]+)/clusters/([^/\s]+)/tokenAuthUsers/([^/\s]+)$`)
+	redisClusterTokenFullIdRegex = regexp.MustCompile(`^projects/([^/\s]+)/locations/([^/\s]+)/clusters/([^/\s]+)/tokenAuthUsers/([^/\s]+)/authTokens/([^/\s]+)$`)
+)
+
+type redisClusterAuthTokenDiff interface {
+	Get(string) interface{}
+	GetOk(string) (interface{}, bool)
+	GetRawConfig() cty.Value
+	NewValueKnown(string) bool
+	SetNew(string, interface{}) error
+	SetNewComputed(string) error
+}
+
+func redisClusterAuthTokenProjectRegionDiff(ctx context.Context, diff *schema.ResourceDiff, meta interface{}) error {
+	skipProjectDefault, skipRegionDefault, err := redisClusterAuthTokenResolveClusterScopeDiff(diff)
+	if err != nil {
+		return err
+	}
+	if !skipProjectDefault {
+		if err := tpgresource.DefaultProviderProject(ctx, diff, meta); err != nil {
+			return err
+		}
+	}
+	if !skipRegionDefault {
+		if err := tpgresource.DefaultProviderRegion(ctx, diff, meta); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func redisClusterAuthTokenResolveClusterScopeDiff(diff redisClusterAuthTokenDiff) (skipProjectDefault, skipRegionDefault bool, err error) {
+	isAttrUnset := func(key string) bool {
+		rawCfg := diff.GetRawConfig()
+		if !rawCfg.IsNull() && rawCfg.Type().IsObjectType() && rawCfg.Type().HasAttribute(key) {
+			attr := rawCfg.GetAttr(key)
+			if !attr.IsKnown() {
+				return false
+			}
+			if attr.IsNull() {
+				return true
+			}
+			return attr.Type() == cty.String && attr.AsString() == ""
+		}
+		if !diff.NewValueKnown(key) {
+			return false
+		}
+		v, ok := diff.GetOk(key)
+		return !ok || v.(string) == ""
+	}
+
+	if !diff.NewValueKnown("cluster") {
+		if isAttrUnset("project") {
+			if err := diff.SetNewComputed("project"); err != nil {
+				return false, false, err
+			}
+			skipProjectDefault = true
+		}
+		if isAttrUnset("region") {
+			if err := diff.SetNewComputed("region"); err != nil {
+				return false, false, err
+			}
+			skipRegionDefault = true
+		}
+		return skipProjectDefault, skipRegionDefault, nil
+	}
+
+	cluster, _ := diff.Get("cluster").(string)
+	if parts := redisClusterFullIdRegex.FindStringSubmatch(cluster); parts != nil {
+		if isAttrUnset("project") {
+			if err := diff.SetNew("project", parts[1]); err != nil {
+				return false, false, err
+			}
+			skipProjectDefault = true
+		}
+		if isAttrUnset("region") {
+			if err := diff.SetNew("region", parts[2]); err != nil {
+				return false, false, err
+			}
+			skipRegionDefault = true
+		}
+		return skipProjectDefault, skipRegionDefault, nil
+	}
+
+	if !diff.NewValueKnown("user_id") {
+		if isAttrUnset("project") {
+			if err := diff.SetNewComputed("project"); err != nil {
+				return false, false, err
+			}
+			skipProjectDefault = true
+		}
+		if isAttrUnset("region") {
+			if err := diff.SetNewComputed("region"); err != nil {
+				return false, false, err
+			}
+			skipRegionDefault = true
+		}
+		return skipProjectDefault, skipRegionDefault, nil
+	}
+
+	userId, _ := diff.Get("user_id").(string)
+	if parts := redisClusterUserFullIdRegex.FindStringSubmatch(userId); parts != nil {
+		if isAttrUnset("project") {
+			if err := diff.SetNew("project", parts[1]); err != nil {
+				return false, false, err
+			}
+			skipProjectDefault = true
+		}
+		if isAttrUnset("region") {
+			if err := diff.SetNew("region", parts[2]); err != nil {
+				return false, false, err
+			}
+			skipRegionDefault = true
+		}
+		return skipProjectDefault, skipRegionDefault, nil
+	}
+
+	return false, false, nil
+}
+
+func redisClusterAuthTokenMatchAttr(d *schema.ResourceData, key, want string, normalize func(string) string) bool {
+	if d == nil || want == "" {
+		return false
+	}
+	cur, _ := d.Get(key).(string)
+	if normalize != nil {
+		cur = normalize(cur)
+	}
+	if cur == "" || cur != want {
+		return false
+	}
+	oldVal, _ := d.GetChange(key)
+	if oldStr, ok := oldVal.(string); ok && oldStr != "" {
+		if normalize != nil {
+			oldStr = normalize(oldStr)
+		}
+		if oldStr != want {
+			return false
+		}
+	}
+	return true
+}
+
+func redisClusterAuthTokenShortSegment(v string) string {
+	return tpgresource.GetResourceNameFromSelfLink(v)
+}
+
+func redisClusterAuthTokenClusterDiffSuppress(_, old, new string, d *schema.ResourceData) bool {
+	if old == "" || new == "" {
+		return false
+	}
+	if old == new {
+		return true
+	}
+
+	parseCluster := func(v string) (proj, reg, cluster string, ok bool) {
+		if !strings.Contains(v, "/") {
+			return "", "", v, true
+		}
+		if parts := redisClusterFullIdRegex.FindStringSubmatch(v); parts != nil {
+			return parts[1], parts[2], parts[3], true
+		}
+		return "", "", "", false
+	}
+
+	oldProj, oldReg, oldCluster, okOld := parseCluster(old)
+	newProj, newReg, newCluster, okNew := parseCluster(new)
+	if !okOld || !okNew || oldCluster != newCluster {
+		return false
+	}
+	if oldProj != "" && newProj != "" && (oldProj != newProj || oldReg != newReg) {
+		return false
+	}
+	for _, proj := range []string{oldProj, newProj} {
+		if proj != "" && !redisClusterAuthTokenMatchAttr(d, "project", proj, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	for _, reg := range []string{oldReg, newReg} {
+		if reg != "" && !redisClusterAuthTokenMatchAttr(d, "region", reg, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	return true
+}
+
+func redisClusterAuthTokenUserDiffSuppress(_, old, new string, d *schema.ResourceData) bool {
+	if old == "" || new == "" {
+		return false
+	}
+	if old == new {
+		return true
+	}
+
+	parseUser := func(v string) (proj, reg, cluster, user string, ok bool) {
+		if !strings.Contains(v, "/") {
+			return "", "", "", v, true
+		}
+		if parts := redisClusterUserFullIdRegex.FindStringSubmatch(v); parts != nil {
+			return parts[1], parts[2], parts[3], parts[4], true
+		}
+		return "", "", "", "", false
+	}
+
+	oldProj, oldReg, oldCluster, oldUser, okOld := parseUser(old)
+	newProj, newReg, newCluster, newUser, okNew := parseUser(new)
+	if !okOld || !okNew || oldUser != newUser {
+		return false
+	}
+	if oldProj != "" && newProj != "" && (oldProj != newProj || oldReg != newReg || oldCluster != newCluster) {
+		return false
+	}
+	for _, proj := range []string{oldProj, newProj} {
+		if proj != "" && !redisClusterAuthTokenMatchAttr(d, "project", proj, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	for _, reg := range []string{oldReg, newReg} {
+		if reg != "" && !redisClusterAuthTokenMatchAttr(d, "region", reg, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	for _, cluster := range []string{oldCluster, newCluster} {
+		if cluster != "" && !redisClusterAuthTokenMatchAttr(d, "cluster", cluster, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	return true
+}
+
+func redisClusterAuthTokenTokenDiffSuppress(_, old, new string, d *schema.ResourceData) bool {
+	if old == "" || new == "" {
+		return false
+	}
+	if old == new {
+		return true
+	}
+
+	parseToken := func(v string) (proj, reg, cluster, user, token string, ok bool) {
+		if !strings.Contains(v, "/") {
+			return "", "", "", "", v, true
+		}
+		if parts := redisClusterTokenFullIdRegex.FindStringSubmatch(v); parts != nil {
+			return parts[1], parts[2], parts[3], parts[4], parts[5], true
+		}
+		return "", "", "", "", "", false
+	}
+
+	oldProj, oldReg, oldCluster, oldUser, oldToken, okOld := parseToken(old)
+	newProj, newReg, newCluster, newUser, newToken, okNew := parseToken(new)
+	if !okOld || !okNew || oldToken != newToken {
+		return false
+	}
+	if oldProj != "" && newProj != "" && (oldProj != newProj || oldReg != newReg || oldCluster != newCluster || oldUser != newUser) {
+		return false
+	}
+	for _, proj := range []string{oldProj, newProj} {
+		if proj != "" && !redisClusterAuthTokenMatchAttr(d, "project", proj, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	for _, reg := range []string{oldReg, newReg} {
+		if reg != "" && !redisClusterAuthTokenMatchAttr(d, "region", reg, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	for _, cluster := range []string{oldCluster, newCluster} {
+		if cluster != "" && !redisClusterAuthTokenMatchAttr(d, "cluster", cluster, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	for _, user := range []string{oldUser, newUser} {
+		if user != "" && !redisClusterAuthTokenMatchAttr(d, "user_id", user, redisClusterAuthTokenShortSegment) {
+			return false
+		}
+	}
+	return true
+}
+
+// latestRedisClusterAuthToken selects the AuthToken entry with the highest sequential
 // "version-N" ID from a ListAuthTokens response slice, because :addAuthToken returns
 // the parent TokenAuthUser rather than the newly created token.
-func LatestRedisClusterAuthToken(rawTokens interface{}) (map[string]interface{}, error) {
+func latestRedisClusterAuthToken(rawTokens interface{}) (map[string]interface{}, error) {
 	tokens, ok := rawTokens.([]interface{})
 	if !ok || len(tokens) == 0 {
 		return nil, fmt.Errorf("no authTokens returned")

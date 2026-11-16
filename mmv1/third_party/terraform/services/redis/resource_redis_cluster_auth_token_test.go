@@ -6,86 +6,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-provider-google/google/acctest"
-	tpgredis "github.com/hashicorp/terraform-provider-google/google/services/redis"
+	_ "github.com/hashicorp/terraform-provider-google/google/services/redis"
 )
-
-func TestUnitRedisClusterAuthToken_latestRedisClusterAuthToken(t *testing.T) {
-	t.Parallel()
-
-	cases := map[string]struct {
-		input    interface{}
-		wantName string
-		wantErr  bool
-	}{
-		"nil slice": {
-			input:   nil,
-			wantErr: true,
-		},
-		"empty slice": {
-			input:   []interface{}{},
-			wantErr: true,
-		},
-		"missing name": {
-			input: []interface{}{
-				map[string]interface{}{"token": "abc"},
-				map[string]interface{}{"name": ""},
-			},
-			wantErr: true,
-		},
-		"single version-1": {
-			input: []interface{}{
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-1"},
-			},
-			wantName: "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-1",
-		},
-		"multiple versions ascending": {
-			input: []interface{}{
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-1"},
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-2"},
-			},
-			wantName: "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-2",
-		},
-		"numeric ordering past version-9": {
-			input: []interface{}{
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-10"},
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-9"},
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-2"},
-			},
-			wantName: "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-10",
-		},
-		"prefers versioned over non-versioned": {
-			input: []interface{}{
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/custom-id"},
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-1"},
-			},
-			wantName: "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/version-1",
-		},
-		"falls back to non-versioned": {
-			input: []interface{}{
-				map[string]interface{}{"name": "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/custom-id"},
-			},
-			wantName: "projects/p/locations/r/clusters/c/tokenAuthUsers/u/authTokens/custom-id",
-		},
-	}
-
-	for tn, tc := range cases {
-		t.Run(tn, func(t *testing.T) {
-			got, err := tpgredis.LatestRedisClusterAuthToken(tc.input)
-			if tc.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got %#v", got)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got["name"] != tc.wantName {
-				t.Fatalf("got name %v, want %q", got["name"], tc.wantName)
-			}
-		})
-	}
-}
 
 func TestAccRedisClusterAuthToken_basic(t *testing.T) {
 	t.Parallel()
@@ -97,6 +19,7 @@ func TestAccRedisClusterAuthToken_basic(t *testing.T) {
 	acctest.VcrTest(t, resource.TestCase{
 		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckRedisClusterAuthTokenDestroyProducer(t),
 		Steps: []resource.TestStep{
 			{
 				Config: testAccRedisClusterAuthToken_basic(context),
@@ -125,6 +48,7 @@ func TestAccRedisClusterAuthToken_rotation(t *testing.T) {
 	acctest.VcrTest(t, resource.TestCase{
 		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckRedisClusterAuthTokenDestroyProducer(t),
 		Steps: []resource.TestStep{
 			{
 				Config: testAccRedisClusterAuthToken_rotationStep1(context),
@@ -138,7 +62,7 @@ func TestAccRedisClusterAuthToken_rotation(t *testing.T) {
 				ResourceName:            "google_redis_cluster_auth_token.token2",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"deletion_policy"},
+				ImportStateVerifyIgnore: []string{"region", "deletion_policy"},
 			},
 			{
 				Config: testAccRedisClusterAuthToken_rotationStep2(context),

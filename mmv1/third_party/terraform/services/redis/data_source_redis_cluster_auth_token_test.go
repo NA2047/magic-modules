@@ -18,12 +18,23 @@ func TestAccRedisClusterAuthTokenDatasource(t *testing.T) {
 	acctest.VcrTest(t, resource.TestCase{
 		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckRedisClusterAuthTokenDestroyProducer(t),
 		Steps: []resource.TestStep{
 			{
 				Config: testAccRedisClusterAuthTokenDatasource(context),
 				Check: resource.ComposeTestCheckFunc(
-					acctest.CheckDataSourceStateMatchesResourceState("data.google_redis_cluster_auth_token.with_token_id", "google_redis_cluster_auth_token.token-basic"),
-					acctest.CheckDataSourceStateMatchesResourceState("data.google_redis_cluster_auth_token.with_self_links", "google_redis_cluster_auth_token.token-basic"),
+					// deletion_policy is a client-side Terraform lifecycle setting not returned by the API
+					// and cleared (nil) on the data source so it does not misreport a default "DELETE" policy.
+					acctest.CheckDataSourceStateMatchesResourceStateWithIgnores(
+						"data.google_redis_cluster_auth_token.with_token_id",
+						"google_redis_cluster_auth_token.token-basic",
+						[]string{"deletion_policy"},
+					),
+					acctest.CheckDataSourceStateMatchesResourceStateWithIgnores(
+						"data.google_redis_cluster_auth_token.with_self_links",
+						"google_redis_cluster_auth_token.token-basic",
+						[]string{"deletion_policy"},
+					),
 				),
 			},
 		},
