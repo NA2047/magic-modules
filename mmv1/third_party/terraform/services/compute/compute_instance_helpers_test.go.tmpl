@@ -286,7 +286,7 @@ func TestExpandAndFlattenWorkloadIdentityConfig(t *testing.T) {
 		"identityCertificateEnabled": true,
 		"identityType":               "AGENT_IDENTITY",
 	}
-	gotInstFlatten := flattenInstanceWorkloadIdentityConfig(apiMap)
+	gotInstFlatten := flattenWorkloadIdentityConfig(apiMap)
 	wantInstFlatten := []map[string]interface{}{
 		{
 			"identity":                     "spiffe://example",
@@ -297,7 +297,10 @@ func TestExpandAndFlattenWorkloadIdentityConfig(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(gotInstFlatten, wantInstFlatten) {
-		t.Fatalf("flattenInstanceWorkloadIdentityConfig() = %#v, want %#v", gotInstFlatten, wantInstFlatten)
+		t.Fatalf("flattenWorkloadIdentityConfig() = %#v, want %#v", gotInstFlatten, wantInstFlatten)
+	}
+	if got := FlattenWorkloadIdentityConfigHTTP(map[string]interface{}{}); got != nil {
+		t.Fatalf("FlattenWorkloadIdentityConfigHTTP({}) = %#v, want nil", got)
 	}
 
 	// Ensure template schemas can safely d.Set flattened responses containing identityType.
