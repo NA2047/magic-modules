@@ -1018,3 +1018,11 @@ properties:
       - name: 'identityCertificateEnabled'
         type: Boolean
         description: 'Specifies whether identity certificates are enabled.'
+      - name: 'identityType'
+        type: String
+        description: >-
+          The type of identity to use, such as `SERVICE_ACCOUNT` or `AGENT_IDENTITY`.
+          See https://cloud.google.com/compute/docs/reference/rest/beta/instances for supported values.
+        min_version: beta
+        default_from_api: true
+        is_missing_in_cai: true
