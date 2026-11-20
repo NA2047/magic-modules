@@ -49,9 +49,10 @@ type ExhaustiveFieldStatus struct {
 }
 
 type ExhaustiveMissingTestInfo struct {
-	Fields            map[string]*ExhaustiveFieldStatus `json:"fields"`
-	IncompleteFields  []string                          `json:"incompleteFields"`
-	SuggestedTestNote string                            `json:"suggestedTestNote,omitempty"`
+	Fields             map[string]*ExhaustiveFieldStatus `json:"fields"`
+	IncompleteFields   []string                          `json:"incompleteFields"`
+	SkippedUpdateSteps []string                          `json:"skippedUpdateSteps,omitempty"`
+	SuggestedTestNote  string                            `json:"suggestedTestNote,omitempty"`
 }
 
 // DetectExhaustiveMissingTests checks whether newly added fields (and optionally
@@ -75,7 +76,7 @@ func DetectExhaustiveMissingTests(schemaDiff diff.SchemaDiff, resourceMap map[st
 			continue
 		}
 
-		evaluateResourceTests(resourceName, updatable, fullSchema, targetFields, allTests)
+		skippedUpdateSteps := evaluateResourceTests(resourceName, updatable, fullSchema, targetFields, allTests)
 
 		var incompleteFields []string
 		for _, fieldPath := range sortedFieldPaths(targetFields) {
@@ -87,9 +88,10 @@ func DetectExhaustiveMissingTests(schemaDiff diff.SchemaDiff, resourceMap map[st
 
 		if len(incompleteFields) > 0 {
 			result[resourceName] = &ExhaustiveMissingTestInfo{
-				Fields:            targetFields,
-				IncompleteFields:  incompleteFields,
-				SuggestedTestNote: buildSuggestedTestNote(resourceName, targetFields, incompleteFields),
+				Fields:             targetFields,
+				IncompleteFields:   incompleteFields,
+				SkippedUpdateSteps: skippedUpdateSteps,
+				SuggestedTestNote:  buildSuggestedTestNote(resourceName, targetFields, incompleteFields, skippedUpdateSteps),
 			}
 		}
 	}
@@ -183,9 +185,16 @@ func getExhaustiveTargetFields(
 }
 
 type stepBlockRecord struct {
-	testName  string
-	stepIndex int // 1-based step number
-	block     reader.Block
+	testName   string
+	stepIndex  int // 1-based step number
+	block      reader.Block
+	planChecks *reader.StepPlanChecks
+}
+
+type skippedUpdateTransition struct {
+	note             string
+	skippedModifyFor []string
+	skippedUnsetFor  []string
 }
 
 func evaluateResourceTests(
@@ -194,7 +203,8 @@ func evaluateResourceTests(
 	fullSchema map[string]*schema.Schema,
 	targetFields map[string]*ExhaustiveFieldStatus,
 	allTests []*reader.Test,
-) {
+) []string {
+	var skippedUpdates []skippedUpdateTransition
 	sortedTargets := sortedFieldPaths(targetFields)
 
 	omissionUnset := make(map[string]bool, len(sortedTargets))
@@ -204,7 +214,7 @@ func evaluateResourceTests(
 
 	var allResourceSteps []stepBlockRecord
 
-	for _, test := range allTests {
+	for _, test := range orderOwnResourceTestsFirst(resourceName, allTests) {
 		// Group steps by resource instance label so multi-step transitions follow the same instance.
 		instanceSteps := make(map[string][]stepBlockRecord)
 		var instanceOrder []string
@@ -223,9 +233,10 @@ func evaluateResourceTests(
 			for _, label := range labels {
 				block := resourceBlocks[label]
 				rec := stepBlockRecord{
-					testName:  test.Name,
-					stepIndex: stepIdx + 1,
-					block:     block,
+					testName:   test.Name,
+					stepIndex:  stepIdx + 1,
+					block:      block,
+					planChecks: stepPlanChecksAt(test.PlanChecks, stepIdx),
 				}
 				if _, seen := instanceSteps[label]; !seen {
 					instanceOrder = append(instanceOrder, label)
@@ -259,6 +270,29 @@ func evaluateResourceTests(
 				prev := recs[i-1]
 				curr := recs[i]
 
+				if ok, skipReason := verifyInPlaceUpdateTransition(resourceName, label, prev, curr); !ok {
+					var skippedModify, skippedUnset []string
+					for _, fieldPath := range sortedTargets {
+						st := targetFields[fieldPath]
+						prevPresent := isFieldPresent(prev.block, fieldPath)
+						currPresent := isFieldPresent(curr.block, fieldPath)
+						if st.Modify.Status != StatusExempt && isModifiedInUpdateStep(prev.block, curr.block, prevPresent, currPresent, fieldPath, fullSchema) {
+							skippedModify = append(skippedModify, fieldPath)
+						}
+						if st.Unset.Status != StatusExempt && !omissionUnset[fieldPath] && prevPresent && !currPresent && isParentOrSoleChildAncestorPresent(curr.block, fieldPath, fullSchema) {
+							skippedUnset = append(skippedUnset, fieldPath)
+						}
+					}
+					if len(skippedModify) > 0 || len(skippedUnset) > 0 {
+						skippedUpdates = append(skippedUpdates, skippedUpdateTransition{
+							note:             fmt.Sprintf("%s (step %d -> %d: %s)", test.Name, prev.stepIndex, curr.stepIndex, skipReason),
+							skippedModifyFor: skippedModify,
+							skippedUnsetFor:  skippedUnset,
+						})
+					}
+					continue
+				}
+
 				transitionLabel := fmt.Sprintf("%s (step %d -> %d)", test.Name, prev.stepIndex, curr.stepIndex)
 
 				for _, fieldPath := range sortedTargets {
@@ -267,20 +301,19 @@ func evaluateResourceTests(
 					currPresent := isFieldPresent(curr.block, fieldPath)
 
 					// Check MODIFY.
-					if st.Modify.Status == StatusMissing && prevPresent && currPresent {
-						if isFieldModified(prev.block, curr.block, fieldPath) {
-							st.Modify = TransitionResult{
-								Status:    StatusCovered,
-								CoveredBy: transitionLabel,
-							}
+					if st.Modify.Status == StatusMissing && isModifiedInUpdateStep(prev.block, curr.block, prevPresent, currPresent, fieldPath, fullSchema) {
+						st.Modify = TransitionResult{
+							Status:    StatusCovered,
+							CoveredBy: transitionLabel,
 						}
 					}
 
 					// Check in-place UNSET for mutable fields/blocks. For nested fields like
-					// `foo.bar.baz`, `foo.bar` must remain present so removing `foo` altogether
-					// does not count as unsetting `baz`.
+					// `foo.bar.baz`, `foo.bar` must remain present (unless `baz` is the sole
+					// configurable child in `foo.bar`'s schema) so removing `foo` altogether
+					// does not skip unsetting `baz` on multi-child blocks.
 					if st.Unset.Status == StatusMissing && !omissionUnset[fieldPath] &&
-						prevPresent && !currPresent && isParentPresent(curr.block, fieldPath) {
+						prevPresent && !currPresent && isParentOrSoleChildAncestorPresent(curr.block, fieldPath, fullSchema) {
 						st.Unset = TransitionResult{
 							Status:    StatusCovered,
 							CoveredBy: transitionLabel,
@@ -303,7 +336,7 @@ func evaluateResourceTests(
 			if isFieldPresent(rec.block, fieldPath) {
 				continue
 			}
-			if isParentPresent(rec.block, fieldPath) {
+			if isParentOrSoleChildAncestorPresent(rec.block, fieldPath, fullSchema) {
 				st.Unset = TransitionResult{
 					Status:    StatusCovered,
 					CoveredBy: stepLabel,
@@ -312,6 +345,72 @@ func evaluateResourceTests(
 			}
 		}
 	}
+
+	var relevantSkipped []string
+	seenSkipped := make(map[string]bool)
+	for _, su := range skippedUpdates {
+		if seenSkipped[su.note] {
+			continue
+		}
+		stillMissing := false
+		for _, fp := range su.skippedModifyFor {
+			if targetFields[fp].Modify.Status == StatusMissing {
+				stillMissing = true
+				break
+			}
+		}
+		if !stillMissing {
+			for _, fp := range su.skippedUnsetFor {
+				if targetFields[fp].Unset.Status == StatusMissing {
+					stillMissing = true
+					break
+				}
+			}
+		}
+		if stillMissing {
+			seenSkipped[su.note] = true
+			relevantSkipped = append(relevantSkipped, su.note)
+		}
+	}
+	return relevantSkipped
+}
+
+func stepPlanChecksAt(planChecks []reader.StepPlanChecks, stepIdx int) *reader.StepPlanChecks {
+	if stepIdx >= 0 && stepIdx < len(planChecks) {
+		return &planChecks[stepIdx]
+	}
+	return nil
+}
+
+// verifyInPlaceUpdateTransition reports whether the transition from prev to
+// curr is backed by a PreApply plan check proving the resource was updated in
+// place rather than destroyed and recreated.
+//
+// ReadTestFiles populates Test.PlanChecks 1:1 with Test.Steps, so
+// curr.planChecks is non-nil for every test parsed from Go source and nil only
+// for synthetic unit-test fixtures that omit Test.PlanChecks.
+func verifyInPlaceUpdateTransition(resourceName, label string, prev, curr stepBlockRecord) (bool, string) {
+	addr := resourceName + "." + label
+	if curr.stepIndex != prev.stepIndex+1 {
+		return false, fmt.Sprintf("%s was absent in an intervening step", addr)
+	}
+	pc := curr.planChecks
+	if pc == nil {
+		return true, ""
+	}
+	if pc.ExpectEmptyPlan {
+		return false, "plancheck expects empty plan"
+	}
+	if action, ok := pc.ResourceActions[addr]; ok {
+		if action == "ResourceActionUpdate" {
+			return true, ""
+		}
+		return false, fmt.Sprintf("plancheck expects %s on %s", action, addr)
+	}
+	if pc.ExpectNoDelete {
+		return true, ""
+	}
+	return false, fmt.Sprintf("missing plancheck.ResourceActionUpdate on %s", addr)
 }
 
 // isFieldPresent reports whether fieldPath is configured with a non-null value
@@ -388,6 +487,35 @@ func parentPath(fieldPath string) string {
 	return fieldPath[:idx]
 }
 
+// orderOwnResourceTestsFirst returns a deterministically ordered copy of
+// allTests with the resource's own TestAcc<Resource>_* tests placed ahead of
+// other tests, ordered within each group by shorter test name first and then
+// alphabetically so concise tests (such as _basic or _full) are preferred and
+// CoveredBy is stable regardless of map iteration order in test-reader.
+func orderOwnResourceTestsFirst(resourceName string, allTests []*reader.Test) []*reader.Test {
+	ordered := make([]*reader.Test, len(allTests))
+	copy(ordered, allTests)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		iOwn := isOwnResourceTest(ordered[i].Name, resourceName)
+		jOwn := isOwnResourceTest(ordered[j].Name, resourceName)
+		if iOwn != jOwn {
+			return iOwn
+		}
+		if len(ordered[i].Name) != len(ordered[j].Name) {
+			return len(ordered[i].Name) < len(ordered[j].Name)
+		}
+		return ordered[i].Name < ordered[j].Name
+	})
+	return ordered
+}
+
+func isOwnResourceTest(testName, resourceName string) bool {
+	trimmed := strings.TrimPrefix(resourceName, "google_")
+	prefix := "testacc" + strings.ReplaceAll(trimmed, "_", "")
+	lower := strings.ToLower(testName)
+	return lower == prefix || strings.HasPrefix(lower, prefix+"_")
+}
+
 // getFieldTreeValue returns a deterministic snapshot of all non-null values at
 // or beneath fieldPath so step-to-step comparisons can detect modifications at
 // any nesting depth. A present block with no non-null children (either `bar {}`
@@ -420,6 +548,89 @@ func getFieldTreeValue(block reader.Block, fieldPath string) string {
 
 func isFieldModified(prevBlock, currBlock reader.Block, fieldPath string) bool {
 	return getFieldTreeValue(prevBlock, fieldPath) != getFieldTreeValue(currBlock, fieldPath)
+}
+
+// isModifiedInUpdateStep reports whether an in-place update step modifies
+// fieldPath. Multi-value fields require two distinct non-null values
+// (prevPresent && currPresent), whereas optional single-value enums have only
+// two distinct states (unset and their sole value) and therefore satisfy MODIFY
+// via an in-place unset -> value transition.
+func isModifiedInUpdateStep(
+	prevBlock, currBlock reader.Block,
+	prevPresent, currPresent bool,
+	fieldPath string,
+	fullSchema map[string]*schema.Schema,
+) bool {
+	if prevPresent && currPresent {
+		return isFieldModified(prevBlock, currBlock, fieldPath)
+	}
+	if !prevPresent && currPresent && isSingleValueEnum(fullSchema[fieldPath]) {
+		return isParentOrSoleChildAncestorPresent(prevBlock, fieldPath, fullSchema)
+	}
+	return false
+}
+
+// isParentOrSoleChildAncestorPresent reports whether fieldPath's immediate
+// parent is present in block, or a purely Optional (non-Computed) ancestor
+// whose only configurable schema subtree is a defaultless fieldPath was omitted
+// while that ancestor's parent remained present (avoiding an invalid empty
+// ancestor {} block when unsetting its sole optional child).
+//
+// Two cases are excluded because `ancestor {}` is distinct from omitting
+// `ancestor`:
+//   - Optional+Computed (Computed: true) ancestors: omitting `ancestor` retains
+//     prior state in SDKv2 without clearing child attributes, whereas writing
+//     `ancestor {}` clears the child.
+//   - Children with a schema Default/DefaultFunc: writing `ancestor {}`
+//     populates the child's default value (making `ancestor {}` non-empty in
+//     SDKv2), whereas omitting `ancestor` removes the block without testing the
+//     default.
+func isParentOrSoleChildAncestorPresent(block reader.Block, fieldPath string, fullSchema map[string]*schema.Schema) bool {
+	if isParentPresent(block, fieldPath) {
+		return true
+	}
+	if fieldSchema := fullSchema[fieldPath]; fieldSchema != nil && (fieldSchema.Default != nil || fieldSchema.DefaultFunc != nil) {
+		return false
+	}
+	for anc := parentPath(fieldPath); anc != ""; anc = parentPath(anc) {
+		ancSchema := fullSchema[anc]
+		if ancSchema != nil {
+			if ancSchema.Computed {
+				return false
+			}
+			if ancSchema.Required {
+				continue
+			}
+		}
+		if !isFieldPresent(block, anc) && isParentPresent(block, anc) &&
+			isOnlyConfigurableChildInSchema(anc, fieldPath, fullSchema) {
+			return true
+		}
+	}
+	return false
+}
+
+// isOnlyConfigurableChildInSchema reports whether ancestorPath has no Required
+// or Optional schema fields outside targetPath's lineage, meaning ancestorPath
+// cannot remain non-empty in HCL once targetPath is omitted.
+func isOnlyConfigurableChildInSchema(ancestorPath, targetPath string, fullSchema map[string]*schema.Schema) bool {
+	ancPrefix := ancestorPath + "."
+	targetPrefix := targetPath + "."
+	for k, sch := range fullSchema {
+		if !strings.HasPrefix(k, ancPrefix) {
+			continue
+		}
+		if k == targetPath || strings.HasPrefix(k, targetPrefix) {
+			continue
+		}
+		if strings.HasPrefix(targetPath, k+".") {
+			continue
+		}
+		if sch != nil && (sch.Optional || sch.Required) {
+			return false
+		}
+	}
+	return true
 }
 
 func sortedFieldPaths(fields map[string]*ExhaustiveFieldStatus) []string {
