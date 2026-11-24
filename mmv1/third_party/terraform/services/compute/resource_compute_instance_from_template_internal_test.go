@@ -1,7 +1,5 @@
 package compute
 
-{{ if ne $.TargetVersionName `ga` -}}
-
 import (
 	"reflect"
 	"testing"
@@ -151,4 +149,3 @@ func TestAdjustInstanceFromTemplateWorkloadIdentityConfig(t *testing.T) {
 		})
 	}
 }
-{{- end }}

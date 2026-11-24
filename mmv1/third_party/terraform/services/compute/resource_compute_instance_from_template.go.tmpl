@@ -186,6 +186,9 @@ func resourceComputeInstanceFromTemplateCreate(d *schema.ResourceData, meta inte
 		Project:   project,
 		RawURL:    templateUrl,
 		UserAgent: userAgent,
+{{- if eq $.TargetVersionName "ga" }}
+		ApiVersion: "2026-11-01",
+{{- end }}
 	})
 	if err != nil {
 		return err
@@ -241,8 +244,13 @@ func resourceComputeInstanceFromTemplateCreate(d *schema.ResourceData, meta inte
 			instance["partnerMetadata"] = partnerMetadataConverted
 		}
 	}
-	adjustInstanceFromTemplateWorkloadIdentityConfig(instance, it, len(d.Get("service_account").([]interface{})) > 0)
 	{{- end }}
+	if wic := expandInstanceFromTemplateWorkloadIdentityConfig(d); wic != nil {
+		instance["workloadIdentityConfig"] = wic
+	} else {
+		delete(instance, "workloadIdentityConfig")
+	}
+	adjustInstanceFromTemplateWorkloadIdentityConfig(instance, it, len(d.Get("service_account").([]interface{})) > 0)
 
 	delete(instance, "canIpForward")
 	delete(instance, "deletionProtection")
@@ -289,6 +297,9 @@ func resourceComputeInstanceFromTemplateCreate(d *schema.ResourceData, meta inte
 		RawURL:    insertUrl,
 		UserAgent: userAgent,
 		Body:      instance,
+{{- if eq $.TargetVersionName "ga" }}
+		ApiVersion: "2026-11-01",
+{{- end }}
 	})
 	if err != nil {
 		return fmt.Errorf("Error creating instance: %s", err)
@@ -433,7 +444,37 @@ func adjustInstanceFromTemplateDisks(d *schema.ResourceData, config *transport_t
 	return disks, nil
 }
 
-{{- if ne $.TargetVersionName "ga" }}
+func expandInstanceFromTemplateWorkloadIdentityConfig(d *schema.ResourceData) map[string]interface{} {
+	iek, ok := d.GetOk("workload_identity_config")
+	if !ok {
+		return nil
+	}
+	s, ok := iek.([]interface{})
+	if !ok || len(s) == 0 || s[0] == nil {
+		return nil
+	}
+	wicRes, ok := s[0].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	wicMap := map[string]interface{}{}
+	if v, ok := wicRes["identity"].(string); ok && v != "" {
+		wicMap["identity"] = v
+	}
+	if isWorkloadIdentityCertConfigured(d) {
+		if v, ok := wicRes["identity_certificate_enabled"].(bool); ok {
+			wicMap["identityCertificateEnabled"] = v
+		}
+	}
+	if v, ok := wicRes["identity_type"].(string); ok && v != "" {
+		wicMap["identityType"] = v
+	}
+	if len(wicMap) == 0 {
+		return nil
+	}
+	return wicMap
+}
+
 // adjustInstanceFromTemplateWorkloadIdentityConfig reconciles workload_identity_config
 // overrides on google_compute_instance_from_template against the source template's
 // properties because GCE merges workloadIdentityConfig subfields via leaf-level JSON
@@ -479,7 +520,6 @@ func adjustInstanceFromTemplateWorkloadIdentityConfig(instance, it map[string]in
 		}
 	}
 }
-{{- end }}
 
 func init() {
 	registry.Schema{

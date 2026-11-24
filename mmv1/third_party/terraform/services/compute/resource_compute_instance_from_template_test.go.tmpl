@@ -3091,7 +3091,6 @@ resource "google_compute_instance_from_template" "foobar" {
 `, context)
 }
 
-{{ if ne $.TargetVersionName `ga` -}}
 func TestAccComputeInstanceFromTemplate_workloadIdentity_identityType(t *testing.T) {
 	t.Parallel()
 
@@ -3501,5 +3500,4 @@ resource "google_compute_instance_from_template" "foobar" {
 }
 `, context)
 }
-{{- end }}
 
